@@ -1,0 +1,38 @@
+# Virtual environment
+.venv/
+
+# Environment variables — never commit real credentials
+.env
+.env.*
+*.env
+
+# Raw filing data — large files, reproducible by re-running ingestion
+data/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Pytest
+.pytest_cache/
+.coverage
+
+# Logs
+logs/
+
+# Build artifacts
+*.egg-info/
+dist/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# macOS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/

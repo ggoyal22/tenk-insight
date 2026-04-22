@@ -1,0 +1,9 @@
+# Config loading
+pydantic~=2.0          # typed config models and validation
+pyyaml~=6.0            # reading config/config.yaml
+python-dotenv~=1.0     # loading .env into os.environ
+
+# Database
+psycopg2-binary~=2.9   # PostgreSQL driver (binary wheel; swap for psycopg2 in production)
+pgvector~=0.2          # pgvector Python client for VECTOR type support
+

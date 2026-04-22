@@ -1,0 +1,8 @@
+# Install alongside requirements.txt for local development:
+#   pip install -r requirements.txt -r requirements-dev.txt
+
+pytest~=8.0        # test runner
+mypy~=1.0          # static type checking
+ruff~=0.4          # linting and formatting
+pytest-cov~=5.0    # test coverage reporting
+pre-commit~=3.0    # git hooks for ruff and mypy before each commit

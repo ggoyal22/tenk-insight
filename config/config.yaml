@@ -1,0 +1,57 @@
+# =============================================================================
+# SEC EDGAR RAG System — Application Configuration
+# =============================================================================
+# All tunable parameters live here. Environment-specific values (DB credentials,
+# API keys) belong in .env — see .env.example for the full list.
+# =============================================================================
+
+# ── Data Sources ──────────────────────────────────────────────────────────────
+edgar:
+  tickers:
+    - "NVDA"                    # add more tickers here as needed
+  form_types:
+    - "10-K"                    # add 10-Q, 8-K, etc. here as needed
+  years:
+    - 2024                      # fiscal years to ingest; add more to backfill
+  rate_limit_per_second: 8      # SEC fair-use guideline is max 10 req/s
+  raw_data_dir: "data/raw"      # relative path; resolved to absolute at runtime
+
+
+# ── Embedding ─────────────────────────────────────────────────────────────────
+embedding:
+  model: "BAAI/bge-large-en-v1.5"
+  dimension: 1024               # must match the chosen model's output dimension
+  batch_size: 64                # number of chunks to embed per batch
+  device: "cpu"                 # cpu / cuda / mps (Apple Silicon)
+
+
+# ── Chunking ──────────────────────────────────────────────────────────────────
+chunking:
+  child_chunk_size: 256         # tokens — unit for vector retrieval
+  child_chunk_overlap: 32       # tokens — overlap between consecutive child chunks
+  parent_chunk_size: 1024       # tokens — unit for LLM context delivery
+  parent_chunk_overlap: 64      # tokens — overlap between consecutive parent chunks
+
+
+# ── Vector Index ──────────────────────────────────────────────────────────────
+vector_index:
+  type: "hnsw"                  # only supported type; hnsw is strictly better for RAG (no pre-training required)
+  distance_function: "cosine"   # cosine / l2 / dot
+  hnsw_m: 16                    # connectivity — higher = better recall, more memory
+  hnsw_ef_construction: 64      # build-time search width — higher = better recall, slower build
+
+
+# ── Retrieval ─────────────────────────────────────────────────────────────────
+# Finalized in Phase 3.
+retrieval:
+  top_k: 5                      # number of chunks to retrieve per query
+  # Similarity score in [0, 1] — higher means more similar.
+  # Note: pgvector's <=> operator returns cosine DISTANCE (1 − similarity).
+  # The query layer must convert: filter WHERE 1 - (embedding <=> query) >= threshold
+  similarity_threshold: 0.7
+  # hybrid search weights (vector vs keyword) — TODO: finalize in Phase 3
+
+
+# ── Logging ───────────────────────────────────────────────────────────────────
+logging:
+  level: "INFO"                 # DEBUG / INFO / WARNING / ERROR
