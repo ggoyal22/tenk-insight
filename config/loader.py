@@ -102,12 +102,17 @@ class LoggingConfig(BaseModel):
 # ---------------------------------------------------------------------------
 
 class DatabaseConfig(BaseModel):
+    engine: Literal["postgres"]
     host: str
     port: int = Field(gt=0, le=65535)
     name: str
     user: str
     password: SecretStr = Field(min_length=1)  # use .get_secret_value() when connecting
     pool_size: int = Field(gt=0)
+
+
+class VectorStoreConfig(BaseModel):
+    engine: Literal["pgvector"]
 
 
 # ---------------------------------------------------------------------------
@@ -118,6 +123,7 @@ class AppConfig(BaseModel):
     environment: Literal["dev", "prod", "test"]
     edgar: EdgarConfig
     database: DatabaseConfig
+    vector_store: VectorStoreConfig
     embedding: EmbeddingConfig
     chunking: ChunkingConfig
     vector_index: VectorIndexConfig
@@ -198,7 +204,7 @@ def _load() -> AppConfig:
         raise ValueError(f"config.yaml at {yaml_path} is empty or not valid YAML.")
 
     # Validate all required sections are present before accessing them
-    required_sections = ["edgar", "embedding", "chunking", "vector_index", "retrieval", "logging"]
+    required_sections = ["database", "vector_store", "edgar", "embedding", "chunking", "vector_index", "retrieval", "logging"]
     missing = [s for s in required_sections if s not in yaml_data]
     if missing:
         raise ValueError(
@@ -217,6 +223,7 @@ def _load() -> AppConfig:
     }
 
     db_data = {
+        "engine":    yaml_data["database"]["engine"],
         "host":      _require_env("DB_HOST"),
         "port":      _require_env_int("DB_PORT"),
         "name":      _require_env("DB_NAME"),
@@ -229,6 +236,7 @@ def _load() -> AppConfig:
         environment=_require_env("ENVIRONMENT"),
         edgar=EdgarConfig(**edgar_data),
         database=DatabaseConfig(**db_data),
+        vector_store=VectorStoreConfig(**yaml_data["vector_store"]),
         embedding=EmbeddingConfig(**yaml_data["embedding"]),
         chunking=ChunkingConfig(**yaml_data["chunking"]),
         vector_index=VectorIndexConfig(**yaml_data["vector_index"]),

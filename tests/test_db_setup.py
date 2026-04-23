@@ -19,6 +19,7 @@ from config.loader import (
     LoggingConfig,
     RetrievalConfig,
     VectorIndexConfig,
+    VectorStoreConfig,
 )
 from db.setup import _substitute
 from tests.conftest import (
@@ -29,6 +30,7 @@ from tests.conftest import (
     VALID_LOGGING,
     VALID_RETRIEVAL,
     VALID_VECTOR_INDEX,
+    VALID_VECTOR_STORE,
 )
 
 _SCHEMA_TEMPLATE = Path(__file__).resolve().parent.parent / "db" / "schema.template.sql"
@@ -40,6 +42,7 @@ def _make_config(**vector_index_overrides) -> AppConfig:
         environment="test",
         edgar=EdgarConfig(**VALID_EDGAR),
         database=DatabaseConfig(**VALID_DATABASE),
+        vector_store=VectorStoreConfig(**VALID_VECTOR_STORE),
         embedding=EmbeddingConfig(**VALID_EMBEDDING),
         chunking=ChunkingConfig(**VALID_CHUNKING),
         vector_index=VectorIndexConfig(**{**VALID_VECTOR_INDEX, **vector_index_overrides}),

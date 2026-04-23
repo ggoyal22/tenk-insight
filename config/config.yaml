@@ -5,6 +5,16 @@
 # API keys) belong in .env — see .env.example for the full list.
 # =============================================================================
 
+# ── Database ──────────────────────────────────────────────────────────────────
+database:
+  engine: "postgres"              # postgres — credentials in .env
+
+
+# ── Vector Store ──────────────────────────────────────────────────────────────
+vector_store:
+  engine: "pgvector"              # pgvector / pinecone / qdrant
+
+
 # ── Data Sources ──────────────────────────────────────────────────────────────
 edgar:
   tickers:

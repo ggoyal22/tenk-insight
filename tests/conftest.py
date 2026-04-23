@@ -2,8 +2,20 @@
 Shared test fixtures and constants for the SEC EDGAR RAG test suite.
 """
 
-# Valid field values for constructing Pydantic config models directly in tests.
-# Each dict matches the fields of the corresponding model class.
+import os
+from pathlib import Path
+
+import psycopg2
+import pytest
+from dotenv import load_dotenv
+
+from config.loader import DatabaseConfig
+from db.client.postgres import PostgresClient
+from db.setup import _substitute, _SCHEMA_TEMPLATE
+
+# ---------------------------------------------------------------------------
+# Valid field values for constructing Pydantic config models in unit tests
+# ---------------------------------------------------------------------------
 
 VALID_EDGAR = {
     "tickers": ["NVDA"],
@@ -44,6 +56,7 @@ VALID_LOGGING = {
 }
 
 VALID_DATABASE = {
+    "engine": "postgres",
     "host": "localhost",
     "port": 5432,
     "name": "sec_edgar",
@@ -51,3 +64,85 @@ VALID_DATABASE = {
     "password": "test-password-not-real",
     "pool_size": 5,
 }
+
+VALID_VECTOR_STORE = {
+    "engine": "pgvector",
+}
+
+# ---------------------------------------------------------------------------
+# Integration test fixtures
+# ---------------------------------------------------------------------------
+
+def _load_test_db_config() -> DatabaseConfig:
+    env_path = Path(__file__).resolve().parent.parent / ".env"
+    if env_path.exists():
+        load_dotenv(env_path)
+
+    test_db_name = os.environ.get("TEST_DB_NAME", "").strip()
+    if not test_db_name:
+        pytest.skip("TEST_DB_NAME not set in .env — skipping integration test")
+
+    return DatabaseConfig(
+        engine="postgres",
+        host=os.environ.get("DB_HOST", "localhost"),
+        port=int(os.environ.get("DB_PORT", 5432)),
+        name=test_db_name,
+        user=os.environ.get("DB_USER", "postgres"),
+        password=os.environ.get("DB_PASSWORD", ""),
+        pool_size=2,
+    )
+
+
+@pytest.fixture(scope="session")
+def db_client():
+    config = _load_test_db_config()
+
+    # create test DB if it doesn't exist
+    conn = psycopg2.connect(
+        host=config.host,
+        port=config.port,
+        dbname="postgres",
+        user=config.user,
+        password=config.password.get_secret_value(),
+    )
+    conn.autocommit = True
+    with conn.cursor() as cur:
+        cur.execute("SELECT 1 FROM pg_database WHERE datname = %s", (config.name,))
+        if not cur.fetchone():
+            cur.execute(f'CREATE DATABASE "{config.name}"')
+    conn.close()
+
+    # apply schema to test DB
+    from config.loader import VectorIndexConfig, VectorStoreConfig, AppConfig, EmbeddingConfig, ChunkingConfig, RetrievalConfig, LoggingConfig, EdgarConfig
+    app_config = AppConfig(
+        environment="test",
+        edgar=EdgarConfig(**VALID_EDGAR),
+        database=config,
+        vector_store=VectorStoreConfig(**VALID_VECTOR_STORE),
+        embedding=EmbeddingConfig(**VALID_EMBEDDING),
+        chunking=ChunkingConfig(**VALID_CHUNKING),
+        vector_index=VectorIndexConfig(**VALID_VECTOR_INDEX),
+        retrieval=RetrievalConfig(**VALID_RETRIEVAL),
+        logging=LoggingConfig(**VALID_LOGGING),
+    )
+    sql = _substitute(_SCHEMA_TEMPLATE.read_text(), app_config)
+    schema_conn = psycopg2.connect(
+        host=config.host, port=config.port, dbname=config.name,
+        user=config.user, password=config.password.get_secret_value(),
+    )
+    with schema_conn.cursor() as cur:
+        cur.execute(sql)
+    schema_conn.commit()
+    schema_conn.close()
+
+    client = PostgresClient(config)
+    yield client
+    client.close()
+
+
+@pytest.fixture(autouse=False)
+def truncate_tables(db_client):
+    with db_client.connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("TRUNCATE filings, parent_chunks, chunks CASCADE")
+        conn.commit()

@@ -3,8 +3,10 @@
 
 # Environment variables — never commit real credentials
 .env
-.env.*
+.env.local
+.env.*.local
 *.env
+!.env.example
 
 # Raw filing data — large files, reproducible by re-running ingestion
 data/
