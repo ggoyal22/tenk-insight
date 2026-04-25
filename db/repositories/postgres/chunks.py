@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from db.client.base import DatabaseClient
+from db.client.base import DatabaseClient, DatabaseConnection
 from db.models import ChunkRecord
 from db.repositories.postgres.base import PostgresRepository
 
@@ -27,13 +27,15 @@ class ChunksRepository(PostgresRepository[ChunkRecord]):
 
     # ── Chunks-specific queries ───────────────────────────────────────────────
 
-    def get_by_filing_id(self, filing_id: UUID) -> list[ChunkRecord]:
+    def get_by_filing_id(
+        self, filing_id: UUID, conn: DatabaseConnection | None = None
+    ) -> list[ChunkRecord]:
         col_clause = ", ".join(self._columns)
         sql = (
             f"SELECT {col_clause} FROM {self._table} "
             f"WHERE filing_id = %s ORDER BY chunk_index ASC"
         )
-        rows = self._execute_returning(sql, (str(filing_id),))
+        rows = self._execute_returning(sql, (str(filing_id),), conn=conn)
         return [self._row_to_model(row, self._columns) for row in rows]
 
     def get_unembedded(self, limit: int = 100) -> list[ChunkRecord]:
@@ -50,10 +52,12 @@ class ChunksRepository(PostgresRepository[ChunkRecord]):
         rows = self._execute_returning(sql, (content_hash,))
         return rows[0][0]
 
-    def insert_many(self, records: list[ChunkRecord]) -> None:
+    def insert_many(
+        self, records: list[ChunkRecord], conn: DatabaseConnection | None = None
+    ) -> None:
         cols = [c for c in self._columns if c not in self._auto_columns]
         col_clause = ", ".join(cols)
         placeholders = ", ".join(["%s"] * len(cols))
         sql = f"INSERT INTO {self._table} ({col_clause}) VALUES ({placeholders})"
         params_list = [self._model_to_params(r) for r in records]
-        self._execute_many(sql, params_list)
+        self._execute_many(sql, params_list, conn=conn)

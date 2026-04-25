@@ -1,6 +1,7 @@
 import logging
 
 import psycopg2
+import psycopg2.extras
 from psycopg2 import pool
 
 from config.loader import DatabaseConfig
@@ -11,6 +12,7 @@ logger = logging.getLogger(__name__)
 
 class PostgresClient(DatabaseClient):
     def __init__(self, config: DatabaseConfig) -> None:
+        psycopg2.extras.register_uuid()
         self._config = config
         self._pool = pool.ThreadedConnectionPool(
             minconn=1,

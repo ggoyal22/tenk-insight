@@ -23,7 +23,6 @@ edgar:
     - "10-K"                    # add 10-Q, 8-K, etc. here as needed
   years:
     - 2024                      # fiscal years to ingest; add more to backfill
-  rate_limit_per_second: 8      # SEC fair-use guideline is max 10 req/s
   raw_data_dir: "data/raw"      # relative path; resolved to absolute at runtime
 
 

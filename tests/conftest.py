@@ -21,8 +21,8 @@ VALID_EDGAR = {
     "tickers": ["NVDA"],
     "form_types": ["10-K"],
     "years": [2024],
-    "rate_limit_per_second": 8,
     "raw_data_dir": "/tmp/data/raw",
+    "user_agent": "Test Suite test@example.com",
 }
 
 VALID_EMBEDDING = {

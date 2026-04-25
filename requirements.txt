@@ -7,3 +7,8 @@ python-dotenv~=1.0     # loading .env into os.environ
 psycopg2-binary~=2.9   # PostgreSQL driver (binary wheel; swap for psycopg2 in production)
 pgvector~=0.2          # pgvector Python client for VECTOR type support
 
+# ETL
+edgartools~=5.30       # SEC EDGAR filing download and HTML parsing
+tiktoken~=0.7          # token counting for chunk sizing (cl100k_base encoding)
+sentence-transformers~=3.0  # local embedding model runner (HuggingFace Hub models)
+

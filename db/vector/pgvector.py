@@ -7,6 +7,8 @@ from db.vector.base import SearchResult, VectorStore
 
 logger = logging.getLogger(__name__)
 
+_ALLOWED_FILTER_COLS = frozenset({"filing_id", "section", "chunk_type", "embedding_model"})
+
 # Maps config distance function name to pgvector operator and ops class
 _DISTANCE_OPERATOR = {
     "cosine": "<=>",
@@ -60,6 +62,11 @@ class PgvectorStore(VectorStore):
         params: list = [query_vector, self._similarity_threshold]
 
         if filters:
+            invalid = filters.keys() - _ALLOWED_FILTER_COLS
+            if invalid:
+                raise ValueError(
+                    f"Invalid filter column(s): {invalid}. Allowed: {_ALLOWED_FILTER_COLS}"
+                )
             for col, val in filters.items():
                 where_clauses.append(f"{col} = %s")
                 params.append(val)

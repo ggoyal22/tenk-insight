@@ -32,8 +32,8 @@ class EdgarConfig(BaseModel):
     tickers: list[str] = Field(min_length=1)
     form_types: list[str] = Field(min_length=1)
     years: list[int] = Field(min_length=1)
-    rate_limit_per_second: int = Field(gt=0, le=10)  # SEC fair-use guideline is max 10 req/s
     raw_data_dir: Path              # resolved to absolute path at load time
+    user_agent: str                 # e.g. "Project Name contact@example.com" — required by SEC fair-use policy
 
     @field_validator("tickers")
     @classmethod
@@ -220,6 +220,7 @@ def _load() -> AppConfig:
     edgar_data = {
         **yaml_data["edgar"],
         "raw_data_dir": raw_data_dir,
+        "user_agent": _require_env("EDGAR_USER_AGENT"),
     }
 
     db_data = {
