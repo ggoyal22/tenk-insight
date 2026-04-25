@@ -38,3 +38,8 @@ dist/
 # IDE
 .vscode/
 .idea/
+
+# Editor swap/temp files
+*.swp
+*.swo
+*~
