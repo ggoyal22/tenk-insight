@@ -4,7 +4,8 @@ from abc import abstractmethod
 from typing import Generic, TypeVar
 from uuid import UUID
 
-from db.client.base import DatabaseClient, DatabaseConnection
+from db.client.base import DatabaseClient, DatabaseConnection, Transaction
+from db.client.postgres import PostgresTransaction
 from db.repositories.base import RelationalRepository
 
 logger = logging.getLogger(__name__)
@@ -49,13 +50,18 @@ class PostgresRepository(RelationalRepository[T], Generic[T]):
 
     # ── Shared plumbing ───────────────────────────────────────────────────────
 
-    def _execute_returning(
-        self, sql: str, params: tuple = (), conn: DatabaseConnection | None = None
-    ) -> list[tuple]:
-        """Run a query that returns rows — SELECT, INSERT RETURNING, UPDATE RETURNING.
+    def _conn_from_tx(self, tx: Transaction | None) -> DatabaseConnection | None:
+        """Extract the underlying connection from a PostgresTransaction, or None."""
+        return tx.conn if isinstance(tx, PostgresTransaction) else None
 
-        If conn is provided the caller owns the transaction (no commit here).
+    def _execute_returning(
+        self, sql: str, params: tuple = (), tx: Transaction | None = None
+    ) -> list[tuple]:
+        """Run a query that returns rows (SELECT, INSERT RETURNING, UPDATE RETURNING).
+
+        If tx is provided the caller owns the transaction (no commit here).
         """
+        conn = self._conn_from_tx(tx)
         if conn is not None:
             with conn.cursor() as cur:
                 cur.execute(sql, params)
@@ -68,7 +74,7 @@ class PostgresRepository(RelationalRepository[T], Generic[T]):
             return results
 
     def _execute_rowcount(self, sql: str, params: tuple = ()) -> int:
-        """Run a statement that returns affected row count — DELETE, UPDATE without RETURNING."""
+        """Run a statement that returns affected row count (DELETE, UPDATE without RETURNING)."""
         with self._client.connection() as _conn:
             with _conn.cursor() as cur:
                 cur.execute(sql, params)
@@ -77,12 +83,13 @@ class PostgresRepository(RelationalRepository[T], Generic[T]):
             return count
 
     def _execute_many(
-        self, sql: str, params_list: list[tuple], conn: DatabaseConnection | None = None
+        self, sql: str, params_list: list[tuple], tx: Transaction | None = None
     ) -> None:
-        """Run a bulk write statement — INSERT of multiple rows.
+        """Run a bulk write statement (INSERT of multiple rows).
 
-        If conn is provided the caller owns the transaction (no commit here).
+        If tx is provided the caller owns the transaction (no commit here).
         """
+        conn = self._conn_from_tx(tx)
         if conn is not None:
             with conn.cursor() as cur:
                 cur.executemany(sql, params_list)
@@ -94,12 +101,12 @@ class PostgresRepository(RelationalRepository[T], Generic[T]):
 
     # ── RelationalRepository implementation ───────────────────────────────────
 
-    def insert(self, record: T, conn: DatabaseConnection | None = None) -> UUID:
+    def insert(self, record: T, tx: Transaction | None = None) -> UUID:
         cols = [c for c in self._columns if c not in self._auto_columns]
         col_clause = ", ".join(cols)
         placeholders = ", ".join(["%s"] * len(cols))
         sql = f"INSERT INTO {self._table} ({col_clause}) VALUES ({placeholders}) RETURNING id"
-        rows = self._execute_returning(sql, self._model_to_params(record), conn=conn)
+        rows = self._execute_returning(sql, self._model_to_params(record), tx=tx)
         if not rows:
             raise RuntimeError(f"INSERT INTO {self._table} returned no rows — this is unexpected.")
         return UUID(str(rows[0][0]))

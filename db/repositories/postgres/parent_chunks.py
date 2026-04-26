@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from db.client.base import DatabaseClient
+from db.client.base import DatabaseClient, Transaction
 from db.models import ParentChunkRecord
 from db.repositories.parent_chunks import ParentChunksRepo
 from db.repositories.postgres.base import PostgresRepository
@@ -42,10 +42,10 @@ class PostgresParentChunksRepository(ParentChunksRepo, PostgresRepository[Parent
         rows = self._execute_returning(sql, (content_hash,))
         return rows[0][0]
 
-    def insert_many(self, records: list[ParentChunkRecord]) -> None:
+    def insert_many(self, records: list[ParentChunkRecord], tx: Transaction | None = None) -> None:
         cols = [c for c in self._columns if c not in self._auto_columns]
         col_clause = ", ".join(cols)
         placeholders = ", ".join(["%s"] * len(cols))
         sql = f"INSERT INTO {self._table} ({col_clause}) VALUES ({placeholders})"
         params_list = [self._model_to_params(r) for r in records]
-        self._execute_many(sql, params_list)
+        self._execute_many(sql, params_list, tx=tx)

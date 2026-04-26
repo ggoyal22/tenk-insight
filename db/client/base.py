@@ -11,6 +11,15 @@ class DatabaseConnection(Protocol):
     def close(self) -> None: ...
 
 
+class Transaction(ABC):
+    """Opaque handle for an in-progress transaction.
+
+    Passed to repository methods to enlist them in the caller's transaction.
+    Internal structure is backend-specific; callers must not inspect it.
+    """
+    pass
+
+
 class DatabaseClient(ABC):
     @abstractmethod
     def get_connection(self) -> DatabaseConnection: ...
@@ -34,3 +43,14 @@ class DatabaseClient(ABC):
             raise
         finally:
             self.release_connection(conn)
+
+    @contextmanager
+    @abstractmethod
+    def transaction(self) -> Generator[Transaction, None, None]:
+        """Start a transaction and yield an opaque handle.
+
+        Commits on clean exit, rolls back on exception, and releases the
+        connection in both cases. Pass the yielded handle to repository methods
+        to enlist them in this transaction.
+        """
+        ...

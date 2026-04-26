@@ -1,13 +1,22 @@
 import logging
+from contextlib import contextmanager
+from typing import Generator
 
 import psycopg2
 import psycopg2.extras
 from psycopg2 import pool
 
 from config.loader import DatabaseConfig
-from db.client.base import DatabaseClient, DatabaseConnection
+from db.client.base import DatabaseClient, DatabaseConnection, Transaction
 
 logger = logging.getLogger(__name__)
+
+
+class PostgresTransaction(Transaction):
+    """Wraps a live psycopg2 connection. Accessible within the postgres package only."""
+
+    def __init__(self, conn: DatabaseConnection) -> None:
+        self.conn = conn
 
 
 class PostgresClient(DatabaseClient):
@@ -52,3 +61,15 @@ class PostgresClient(DatabaseClient):
     def close(self) -> None:
         self._pool.closeall()
         logger.info("PostgresClient pool closed")
+
+    @contextmanager
+    def transaction(self) -> Generator[PostgresTransaction, None, None]:
+        conn = self.get_connection()
+        try:
+            yield PostgresTransaction(conn)
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            self.release_connection(conn)

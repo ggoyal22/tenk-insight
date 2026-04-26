@@ -2,12 +2,14 @@ from abc import ABC, abstractmethod
 from typing import Generic, TypeVar
 from uuid import UUID
 
+from db.client.base import Transaction
+
 T = TypeVar("T")
 
 
 class RelationalRepository(ABC, Generic[T]):
     @abstractmethod
-    def insert(self, record: T) -> UUID: ...
+    def insert(self, record: T, tx: Transaction | None = None) -> UUID: ...
 
     @abstractmethod
     def get_by_id(self, id: UUID) -> T | None: ...

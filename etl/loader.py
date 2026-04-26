@@ -68,9 +68,9 @@ class Loader:
         # A crash at any point rolls back the entire transaction — the DB is left clean.
         chunk_uuid_map: dict[int, UUID] = {}
         try:
-            with self._db_client.connection() as conn:
+            with self._db_client.transaction() as tx:
                 # Step 1 — filing row
-                filing_uuid = self._filings_repo.insert(filing, conn=conn)
+                filing_uuid = self._filings_repo.insert(filing, tx=tx)
                 logger.info("Inserted filing %s → %s", filing.accession_number, filing_uuid)
 
                 # Step 2 — parent chunks; collect UUIDs to wire child FK in step 3
@@ -88,7 +88,7 @@ class Loader:
                         created_at=now,
                     )
                     parent_uuid_map[parent.filing_chunk_index] = (
-                        self._parent_chunks_repo.insert(record, conn=conn)
+                        self._parent_chunks_repo.insert(record, tx=tx)
                     )
                 logger.info("Inserted %d parent chunks", len(parents))
 
@@ -108,14 +108,12 @@ class Loader:
                     )
                     for child in children
                 ]
-                self._chunks_repo.insert_many(child_records, conn=conn)
+                self._chunks_repo.insert_many(child_records, tx=tx)
                 logger.info("Inserted %d child chunks", len(children))
 
                 # Step 4 — fetch back DB-assigned UUIDs needed for vector upsert
-                inserted = self._chunks_repo.get_by_filing_id(filing_uuid, conn=conn)
+                inserted = self._chunks_repo.get_by_filing_id(filing_uuid, tx=tx)
                 chunk_uuid_map = {c.chunk_index: c.id for c in inserted}
-
-                conn.commit()
 
         except psycopg2.errors.UniqueViolation:
             # A concurrent worker inserted the same filing between our dedup check
