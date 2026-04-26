@@ -1,8 +1,8 @@
 from config.loader import AppConfig
 from db.client.base import DatabaseClient
-from db.repositories.postgres.chunks import ChunksRepository
-from db.repositories.postgres.filings import FilingsRepository
-from db.repositories.postgres.parent_chunks import ParentChunksRepository
+from db.repositories.chunks import ChunksRepo
+from db.repositories.filings import FilingsRepo
+from db.repositories.parent_chunks import ParentChunksRepo
 from db.vector.base import VectorStore
 from etl.chunker.base import Chunker
 from etl.chunker.recursive import RecursiveChunker
@@ -33,9 +33,9 @@ def create_embedder(config: AppConfig) -> Embedder:
 
 def create_loader(
     db_client: DatabaseClient,
-    filings_repo: FilingsRepository,
-    parent_chunks_repo: ParentChunksRepository,
-    chunks_repo: ChunksRepository,
+    filings_repo: FilingsRepo,
+    parent_chunks_repo: ParentChunksRepo,
+    chunks_repo: ChunksRepo,
     vector_store: VectorStore,
 ) -> Loader:
     return Loader(db_client, filings_repo, parent_chunks_repo, chunks_repo, vector_store)

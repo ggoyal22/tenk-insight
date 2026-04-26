@@ -2,10 +2,11 @@ from uuid import UUID
 
 from db.client.base import DatabaseClient, DatabaseConnection
 from db.models import ChunkRecord
+from db.repositories.chunks import ChunksRepo
 from db.repositories.postgres.base import PostgresRepository
 
 
-class ChunksRepository(PostgresRepository[ChunkRecord]):
+class PostgresChunksRepository(ChunksRepo, PostgresRepository[ChunkRecord]):
     def __init__(self, client: DatabaseClient) -> None:
         super().__init__(client)
 

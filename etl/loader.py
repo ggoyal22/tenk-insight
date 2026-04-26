@@ -6,9 +6,9 @@ import psycopg2.errors
 
 from db.client.base import DatabaseClient
 from db.models import ChunkRecord, FilingRecord, ParentChunkRecord
-from db.repositories.postgres.chunks import ChunksRepository
-from db.repositories.postgres.filings import FilingsRepository
-from db.repositories.postgres.parent_chunks import ParentChunksRepository
+from db.repositories.chunks import ChunksRepo
+from db.repositories.filings import FilingsRepo
+from db.repositories.parent_chunks import ParentChunksRepo
 from db.vector.base import VectorStore
 from etl.types import ChildChunk, ParentChunk
 
@@ -19,9 +19,9 @@ class Loader:
     def __init__(
         self,
         db_client: DatabaseClient,
-        filings_repo: FilingsRepository,
-        parent_chunks_repo: ParentChunksRepository,
-        chunks_repo: ChunksRepository,
+        filings_repo: FilingsRepo,
+        parent_chunks_repo: ParentChunksRepo,
+        chunks_repo: ChunksRepo,
         vector_store: VectorStore,
     ) -> None:
         self._db_client = db_client

@@ -2,10 +2,11 @@ from uuid import UUID
 
 from db.client.base import DatabaseClient
 from db.models import ParentChunkRecord
+from db.repositories.parent_chunks import ParentChunksRepo
 from db.repositories.postgres.base import PostgresRepository
 
 
-class ParentChunksRepository(PostgresRepository[ParentChunkRecord]):
+class PostgresParentChunksRepository(ParentChunksRepo, PostgresRepository[ParentChunkRecord]):
     def __init__(self, client: DatabaseClient) -> None:
         super().__init__(client)
 

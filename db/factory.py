@@ -1,9 +1,12 @@
 from config.loader import AppConfig
 from db.client.base import DatabaseClient
 from db.client.postgres import PostgresClient
-from db.repositories.postgres.chunks import ChunksRepository
-from db.repositories.postgres.filings import FilingsRepository
-from db.repositories.postgres.parent_chunks import ParentChunksRepository
+from db.repositories.chunks import ChunksRepo
+from db.repositories.filings import FilingsRepo
+from db.repositories.parent_chunks import ParentChunksRepo
+from db.repositories.postgres.chunks import PostgresChunksRepository
+from db.repositories.postgres.filings import PostgresFilingsRepository
+from db.repositories.postgres.parent_chunks import PostgresParentChunksRepository
 from db.vector.base import VectorStore
 from db.vector.pgvector import PgvectorStore
 
@@ -26,13 +29,13 @@ def create_vector_store(config: AppConfig, client: DatabaseClient) -> VectorStor
     raise ValueError(f"Unsupported vector store engine: {engine!r}")
 
 
-def create_filings_repo(client: DatabaseClient) -> FilingsRepository:
-    return FilingsRepository(client)
+def create_filings_repo(client: DatabaseClient) -> FilingsRepo:
+    return PostgresFilingsRepository(client)
 
 
-def create_parent_chunks_repo(client: DatabaseClient) -> ParentChunksRepository:
-    return ParentChunksRepository(client)
+def create_parent_chunks_repo(client: DatabaseClient) -> ParentChunksRepo:
+    return PostgresParentChunksRepository(client)
 
 
-def create_chunks_repo(client: DatabaseClient) -> ChunksRepository:
-    return ChunksRepository(client)
+def create_chunks_repo(client: DatabaseClient) -> ChunksRepo:
+    return PostgresChunksRepository(client)

@@ -3,9 +3,8 @@ from uuid import uuid4
 
 import pytest
 
+from db.factory import create_chunks_repo, create_filings_repo
 from db.models import FilingRecord, ChunkRecord
-from db.repositories.postgres.chunks import ChunksRepository
-from db.repositories.postgres.filings import FilingsRepository
 from db.vector.pgvector import PgvectorStore
 
 
@@ -50,14 +49,14 @@ def vector_store(db_client):
 class TestPgvectorStore:
     @pytest.fixture
     def chunk_id(self, db_client):
-        filing_id = FilingsRepository(db_client).insert(_filing())
-        return ChunksRepository(db_client).insert(_chunk(filing_id))
+        filing_id = create_filings_repo(db_client).insert(_filing())
+        return create_chunks_repo(db_client).insert(_chunk(filing_id))
 
     def test_upsert_sets_embedding(self, vector_store, db_client, chunk_id):
         embedding = [0.1] * 1024
         vector_store.upsert(chunk_id, embedding, {"embedding_model": "BAAI/bge-large-en-v1.5"})
 
-        fetched = ChunksRepository(db_client).get_by_id(chunk_id)
+        fetched = create_chunks_repo(db_client).get_by_id(chunk_id)
         assert fetched is not None
         assert fetched.embedded_at is not None
         assert fetched.embedding_model == "BAAI/bge-large-en-v1.5"
@@ -72,8 +71,8 @@ class TestPgvectorStore:
         assert 0.0 <= results[0].score <= 1.0
 
     def test_search_respects_top_k(self, vector_store, db_client):
-        filing_id = FilingsRepository(db_client).insert(_filing())
-        chunks_repo = ChunksRepository(db_client)
+        filing_id = create_filings_repo(db_client).insert(_filing())
+        chunks_repo = create_chunks_repo(db_client)
         embedding = [0.1] * 1024
         for i in range(5):
             cid = chunks_repo.insert(_chunk(filing_id, chunk_index=i))
@@ -87,7 +86,7 @@ class TestPgvectorStore:
         vector_store.upsert(chunk_id, embedding, {"embedding_model": "BAAI/bge-large-en-v1.5"})
         assert vector_store.delete_embedding(chunk_id) is True
 
-        fetched = ChunksRepository(db_client).get_by_id(chunk_id)
+        fetched = create_chunks_repo(db_client).get_by_id(chunk_id)
         assert fetched is not None
         assert fetched.embedding is None
         assert fetched.embedded_at is None

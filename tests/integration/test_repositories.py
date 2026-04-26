@@ -3,10 +3,8 @@ from uuid import UUID, uuid4
 
 import pytest
 
+from db.factory import create_chunks_repo, create_filings_repo, create_parent_chunks_repo
 from db.models import ChunkRecord, FilingRecord, ParentChunkRecord
-from db.repositories.postgres.chunks import ChunksRepository
-from db.repositories.postgres.filings import FilingsRepository
-from db.repositories.postgres.parent_chunks import ParentChunksRepository
 
 
 def _filing(accession_number: str = "0001045810-24-000001") -> FilingRecord:
@@ -57,7 +55,7 @@ def _chunk(filing_id: UUID, parent_chunk_id: UUID | None = None, chunk_index: in
 class TestFilingsRepository:
     @pytest.fixture
     def repo(self, db_client):
-        return FilingsRepository(db_client)
+        return create_filings_repo(db_client)
 
     def test_insert_and_get_by_id(self, repo):
         record = _filing()
@@ -125,12 +123,11 @@ class TestFilingsRepository:
 class TestParentChunksRepository:
     @pytest.fixture
     def filing_id(self, db_client):
-        repo = FilingsRepository(db_client)
-        return repo.insert(_filing())
+        return create_filings_repo(db_client).insert(_filing())
 
     @pytest.fixture
     def repo(self, db_client):
-        return ParentChunksRepository(db_client)
+        return create_parent_chunks_repo(db_client)
 
     def test_insert_and_get_by_id(self, repo, filing_id):
         record = _parent_chunk(filing_id)
@@ -166,11 +163,11 @@ class TestParentChunksRepository:
 class TestChunksRepository:
     @pytest.fixture
     def filing_id(self, db_client):
-        return FilingsRepository(db_client).insert(_filing())
+        return create_filings_repo(db_client).insert(_filing())
 
     @pytest.fixture
     def repo(self, db_client):
-        return ChunksRepository(db_client)
+        return create_chunks_repo(db_client)
 
     def test_insert_and_get_by_id(self, repo, filing_id):
         record = _chunk(filing_id)

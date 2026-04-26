@@ -1,9 +1,10 @@
 from db.client.base import DatabaseClient
 from db.models import FilingRecord
+from db.repositories.filings import FilingsRepo
 from db.repositories.postgres.base import PostgresRepository
 
 
-class FilingsRepository(PostgresRepository[FilingRecord]):
+class PostgresFilingsRepository(FilingsRepo, PostgresRepository[FilingRecord]):
     def __init__(self, client: DatabaseClient) -> None:
         super().__init__(client)
 
