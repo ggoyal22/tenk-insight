@@ -1,3 +1,5 @@
+from uuid import UUID
+
 from db.client.base import DatabaseClient
 from db.models import FilingRecord
 from db.repositories.filings import FilingsRepo
@@ -44,3 +46,21 @@ class PostgresFilingsRepository(FilingsRepo, PostgresRepository[FilingRecord]):
         sql = f"SELECT EXISTS(SELECT 1 FROM {self._table} WHERE accession_number = %s)"
         rows = self._execute_returning(sql, (accession_number,))
         return rows[0][0]
+
+    def list_ids(self, filters: dict | None = None) -> list[UUID]:
+        sql = f"SELECT id FROM {self._table}"
+        params: tuple = ()
+
+        if filters:
+            invalid = filters.keys() - set(self._columns)
+            if invalid:
+                raise ValueError(
+                    f"Invalid filter columns for {self._table}: {invalid}. "
+                    f"Allowed: {self._columns}"
+                )
+            where_clause = " AND ".join(f"{k} = %s" for k in filters)
+            sql += f" WHERE {where_clause}"
+            params = tuple(filters.values())
+
+        rows = self._execute_returning(sql, params)
+        return [UUID(str(row[0])) for row in rows]

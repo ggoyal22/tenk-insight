@@ -62,3 +62,47 @@ class PostgresChunksRepository(ChunksRepo, PostgresRepository[ChunkRecord]):
         sql = f"INSERT INTO {self._table} ({col_clause}) VALUES ({placeholders})"
         params_list = [self._model_to_params(r) for r in records]
         self._execute_many(sql, params_list, tx=tx)
+
+    # ── Keyword search (FTS implementation) ──────────────────────────────────
+    # Uses PostgreSQL tsvector/tsquery. A future Pg_bm25ChunksRepository would
+    # subclass this and override keyword_search with pg_bm25 SQL.
+
+    _QUERY_FN: dict[str, str] = {
+        "standard": "plainto_tsquery",
+        "phrase":   "phraseto_tsquery",
+        "web":      "websearch_to_tsquery",
+    }
+
+    def keyword_search(
+        self,
+        query: str,
+        top_k: int,
+        filing_ids: list[UUID] | None = None,
+        section: str | None = None,
+        query_mode: str = "web",
+    ) -> list[tuple[UUID, float]]:
+        query_fn = self._QUERY_FN.get(query_mode, "websearch_to_tsquery")
+
+        where_parts = [f"search_vector @@ {query_fn}('english', %s)"]
+        params: list = [query]
+
+        if filing_ids is not None:
+            where_parts.append("filing_id = ANY(%s::uuid[])")
+            params.append([str(fid) for fid in filing_ids])
+
+        if section is not None:
+            where_parts.append("section = %s")
+            params.append(section)
+
+        where = " AND ".join(where_parts)
+        # query appears twice: once in WHERE tsquery and once for ts_rank scoring
+        sql = f"""
+            SELECT id, ts_rank(search_vector, {query_fn}('english', %s)) AS score
+            FROM {self._table}
+            WHERE {where}
+            ORDER BY score DESC
+            LIMIT %s
+        """
+        all_params = [query] + params + [top_k]
+        rows = self._execute_returning(sql, tuple(all_params))
+        return [(UUID(str(row[0])), float(row[1])) for row in rows]

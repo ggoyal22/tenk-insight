@@ -36,6 +36,7 @@ class ParentChunkRecord:
 class ChunkRecord:
     id: UUID
     filing_id: UUID
+    parent_chunk_id: UUID
     chunk_index: int
     section: str
     chunk_type: str
@@ -43,7 +44,6 @@ class ChunkRecord:
     token_count: int
     content_hash: str
     created_at: datetime
-    parent_chunk_id: UUID | None = None
     page_number: int | None = None
     embedding: list[float] | None = None
     embedding_model: str | None = None

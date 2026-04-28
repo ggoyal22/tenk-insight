@@ -8,10 +8,9 @@
 -- below before executing the DDL:
 --
 --   {embedding_dimension}    ← config.embedding.dimension
---   {hnsw_ops_class}         ← derived from config.vector_index.distance_function
---                                cosine → vector_cosine_ops
---                                l2     → vector_l2_ops
---                                dot    → vector_ip_ops
+--   {hnsw_index_col}         ← column expression derived from distance_function + quantization
+--                                e.g. "embedding vector_cosine_ops" (none)
+--                                     "(embedding::halfvec(N)) halfvec_cosine_ops" (halfvec)
 --   {hnsw_m}                 ← config.vector_index.hnsw_m
 --   {hnsw_ef_construction}   ← config.vector_index.hnsw_ef_construction
 -- =============================================================================
@@ -98,7 +97,7 @@ CREATE OR REPLACE TRIGGER parent_chunks_set_updated_at
 CREATE TABLE IF NOT EXISTS chunks (
     id               UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
     filing_id        UUID        NOT NULL REFERENCES filings (id) ON DELETE CASCADE,
-    parent_chunk_id  UUID        REFERENCES parent_chunks (id) ON DELETE SET NULL,
+    parent_chunk_id  UUID        NOT NULL REFERENCES parent_chunks (id) ON DELETE CASCADE,
     -- chunk_index is filing-scoped (not parent-scoped): sequential across all chunks in the filing.
     -- Adjacent-chunk retrieval must filter by parent_chunk_id, not just by chunk_index ± 1.
     chunk_index      INT         NOT NULL CHECK (chunk_index >= 0),        -- sequential position within the filing (0-based)
@@ -112,6 +111,9 @@ CREATE TABLE IF NOT EXISTS chunks (
     embedding_model  VARCHAR,                                              -- model used to produce the embedding, e.g. "BAAI/bge-large-en-v1.5"
     content_hash     VARCHAR(64) NOT NULL CHECK (content_hash ~ '^[0-9a-f]{64}$'), -- SHA-256 hex digest of text; prevents redundant re-embedding
     embedded_at      TIMESTAMPTZ,                                          -- null until embedded
+    -- Generated column: maintained automatically by Postgres on every INSERT/UPDATE to text.
+    -- Used for keyword search (tsvector/tsquery + GIN index). Never written by application code.
+    search_vector    tsvector GENERATED ALWAYS AS (to_tsvector('english', text)) STORED,
     created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at       TIMESTAMPTZ,                                          -- auto-set by trigger on every UPDATE
 
@@ -131,9 +133,13 @@ CREATE OR REPLACE TRIGGER chunks_set_updated_at
     BEFORE UPDATE ON chunks
     FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
--- Vector similarity index (HNSW).
--- Ops class and parameters are substituted from config by the setup script.
+-- GIN index for keyword search (tsvector/tsquery). Maintained automatically by Postgres.
+CREATE INDEX IF NOT EXISTS idx_chunks_search_vector ON chunks USING gin(search_vector);
+
+-- HNSW index for vector similarity search.
+-- {hnsw_index_col} is substituted by setup.py: the column expression includes a halfvec
+-- cast when quantization != "none", e.g. (embedding::halfvec(1024)) halfvec_cosine_ops.
 -- Build this index after bulk data load for best performance.
 CREATE INDEX IF NOT EXISTS idx_chunks_embedding
-    ON chunks USING hnsw (embedding {hnsw_ops_class})
+    ON chunks USING hnsw ({hnsw_index_col})
     WITH (m = {hnsw_m}, ef_construction = {hnsw_ef_construction});

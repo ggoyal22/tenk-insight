@@ -111,6 +111,14 @@ class PostgresRepository(RelationalRepository[T], Generic[T]):
             raise RuntimeError(f"INSERT INTO {self._table} returned no rows — this is unexpected.")
         return UUID(str(rows[0][0]))
 
+    def get_by_ids(self, ids: list[UUID]) -> list[T]:
+        if not ids:
+            return []
+        col_clause = ", ".join(self._columns)
+        sql = f"SELECT {col_clause} FROM {self._table} WHERE id = ANY(%s::uuid[])"
+        rows = self._execute_returning(sql, ([str(i) for i in ids],))
+        return [self._row_to_model(row, self._columns) for row in rows]
+
     def get_by_id(self, id: UUID) -> T | None:
         col_clause = ", ".join(self._columns)
         sql = f"SELECT {col_clause} FROM {self._table} WHERE id = %s"

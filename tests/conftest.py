@@ -47,8 +47,27 @@ VALID_VECTOR_INDEX = {
 }
 
 VALID_RETRIEVAL = {
-    "top_k": 5,
-    "similarity_threshold": 0.7,
+    "metadata_filtering": {"enabled": True},
+    "vector_search": {
+        "enabled": True,
+        "quantization": "none",           # "none" avoids halfvec cast in test DB queries
+        "oversample_k": 5,
+        "similarity_threshold": 0.0,      # low threshold so test embeddings always match
+    },
+    "keyword_search": {
+        "enabled": True,
+        "implementation": "fts",
+        "top_k": 5,
+        "fts": {"query_mode": "web"},
+        "bm25": {"k1": 1.5, "b": 0.75},
+    },
+    "fusion": {"implementation": "rrf", "rrf_k": 60, "top_k": 5},
+    "reranking": {
+        "enabled": False,                 # disabled in tests — avoids loading cross-encoder model
+        "model": "cross-encoder/ms-marco-MiniLM-L-6-v2",
+        "top_k": 5,
+    },
+    "final_top_k": 5,
 }
 
 VALID_LOGGING = {
@@ -107,13 +126,12 @@ def db_client():
     )
     conn.autocommit = True
     with conn.cursor() as cur:
-        cur.execute("SELECT 1 FROM pg_database WHERE datname = %s", (config.name,))
-        if not cur.fetchone():
-            cur.execute(f'CREATE DATABASE "{config.name}"')
+        cur.execute(f'DROP DATABASE IF EXISTS "{config.name}"')
+        cur.execute(f'CREATE DATABASE "{config.name}"')
     conn.close()
 
     # apply schema to test DB
-    from config.loader import VectorIndexConfig, VectorStoreConfig, AppConfig, EmbeddingConfig, ChunkingConfig, RetrievalConfig, LoggingConfig, EdgarConfig
+    from config.loader import AppConfig, ChunkingConfig, EdgarConfig, EmbeddingConfig, LoggingConfig, RetrievalConfig, VectorIndexConfig, VectorStoreConfig
     app_config = AppConfig(
         environment="test",
         edgar=EdgarConfig(**VALID_EDGAR),

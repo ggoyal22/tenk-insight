@@ -23,11 +23,28 @@ from config.loader import AppConfig, ensure_directories, load_config  # noqa: E4
 
 _SCHEMA_TEMPLATE = Path(__file__).resolve().parent / "schema.template.sql"
 
-_HNSW_OPS_CLASS = {
-    "cosine": "vector_cosine_ops",
-    "l2":     "vector_l2_ops",
-    "dot":    "vector_ip_ops",
+# Maps (distance_function, quantization) to the correct pgvector HNSW ops class.
+_HNSW_OPS_CLASS: dict[tuple[str, str], str] = {
+    ("cosine", "none"):    "vector_cosine_ops",
+    ("cosine", "halfvec"): "halfvec_cosine_ops",
+    ("cosine", "scalar"):  "int8_cosine_ops",
+    ("l2",     "none"):    "vector_l2_ops",
+    ("l2",     "halfvec"): "halfvec_l2_ops",
+    ("dot",    "none"):    "vector_ip_ops",
+    ("dot",    "halfvec"): "halfvec_ip_ops",
 }
+
+
+def _hnsw_index_col(config: AppConfig) -> str:
+    """Return the HNSW index column expression for the configured quantization."""
+    vi = config.vector_index
+    q = config.retrieval.vector_search.quantization
+    ops = _HNSW_OPS_CLASS[(vi.distance_function, q)]
+    if q == "none":
+        return f"embedding {ops}"
+    dim = config.embedding.dimension
+    cast = "halfvec" if q == "halfvec" else "int8"
+    return f"(embedding::{cast}({dim})) {ops}"
 
 
 def _substitute(template: str, config: AppConfig) -> str:
@@ -40,8 +57,8 @@ def _substitute(template: str, config: AppConfig) -> str:
     return (
         template
         .replace("{embedding_dimension}", str(config.embedding.dimension))
-        .replace("{hnsw_ops_class}",       _HNSW_OPS_CLASS[vi.distance_function])
-        .replace("{hnsw_m}",               str(vi.hnsw_m))
+        .replace("{hnsw_index_col}",      _hnsw_index_col(config))
+        .replace("{hnsw_m}",              str(vi.hnsw_m))
         .replace("{hnsw_ef_construction}", str(vi.hnsw_ef_construction))
     )
 

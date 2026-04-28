@@ -54,7 +54,7 @@ def _make_config(**vector_index_overrides) -> AppConfig:
 # Minimal template that contains all four placeholders for focused unit tests
 _MINIMAL_TEMPLATE = (
     "VECTOR({embedding_dimension}) "
-    "hnsw (embedding {hnsw_ops_class}) "
+    "hnsw ({hnsw_index_col}) "
     "m = {hnsw_m}, ef_construction = {hnsw_ef_construction}"
 )
 

@@ -34,7 +34,7 @@ def _parent_chunk(filing_id: UUID, chunk_index: int = 0) -> ParentChunkRecord:
     )
 
 
-def _chunk(filing_id: UUID, parent_chunk_id: UUID | None = None, chunk_index: int = 0) -> ChunkRecord:
+def _chunk(filing_id: UUID, parent_chunk_id: UUID, chunk_index: int = 0) -> ChunkRecord:
     return ChunkRecord(
         id=uuid4(),
         filing_id=filing_id,
@@ -166,42 +166,46 @@ class TestChunksRepository:
         return create_filings_repo(db_client).insert(_filing())
 
     @pytest.fixture
+    def parent_chunk_id(self, db_client, filing_id):
+        return create_parent_chunks_repo(db_client).insert(_parent_chunk(filing_id))
+
+    @pytest.fixture
     def repo(self, db_client):
         return create_chunks_repo(db_client)
 
-    def test_insert_and_get_by_id(self, repo, filing_id):
-        record = _chunk(filing_id)
+    def test_insert_and_get_by_id(self, repo, filing_id, parent_chunk_id):
+        record = _chunk(filing_id, parent_chunk_id)
         id_ = repo.insert(record)
         fetched = repo.get_by_id(id_)
         assert fetched is not None
         assert fetched.chunk_type == "narrative"
 
-    def test_get_by_filing_id(self, repo, filing_id):
-        repo.insert(_chunk(filing_id, chunk_index=0))
-        repo.insert(_chunk(filing_id, chunk_index=1))
+    def test_get_by_filing_id(self, repo, filing_id, parent_chunk_id):
+        repo.insert(_chunk(filing_id, parent_chunk_id, chunk_index=0))
+        repo.insert(_chunk(filing_id, parent_chunk_id, chunk_index=1))
         results = repo.get_by_filing_id(filing_id)
         assert len(results) == 2
 
-    def test_get_unembedded(self, repo, filing_id):
-        repo.insert(_chunk(filing_id, chunk_index=0))
-        repo.insert(_chunk(filing_id, chunk_index=1))
+    def test_get_unembedded(self, repo, filing_id, parent_chunk_id):
+        repo.insert(_chunk(filing_id, parent_chunk_id, chunk_index=0))
+        repo.insert(_chunk(filing_id, parent_chunk_id, chunk_index=1))
         results = repo.get_unembedded()
         assert len(results) == 2
         assert all(r.embedded_at is None for r in results)
 
-    def test_exists_by_content_hash(self, repo, filing_id):
-        record = _chunk(filing_id)
+    def test_exists_by_content_hash(self, repo, filing_id, parent_chunk_id):
+        record = _chunk(filing_id, parent_chunk_id)
         repo.insert(record)
         assert repo.exists_by_content_hash(record.content_hash) is True
         assert repo.exists_by_content_hash("z" * 64) is False
 
-    def test_insert_many(self, repo, filing_id):
-        records = [_chunk(filing_id, chunk_index=i) for i in range(3)]
+    def test_insert_many(self, repo, filing_id, parent_chunk_id):
+        records = [_chunk(filing_id, parent_chunk_id, chunk_index=i) for i in range(3)]
         repo.insert_many(records)
         results = repo.get_by_filing_id(filing_id)
         assert len(results) == 3
 
-    def test_delete(self, repo, filing_id):
-        id_ = repo.insert(_chunk(filing_id))
+    def test_delete(self, repo, filing_id, parent_chunk_id):
+        id_ = repo.insert(_chunk(filing_id, parent_chunk_id))
         assert repo.delete(id_) is True
         assert repo.exists(id_) is False

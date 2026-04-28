@@ -88,9 +88,82 @@ class VectorIndexConfig(BaseModel):
     hnsw_ef_construction: int = Field(default=64, gt=0)
 
 
+class MetadataFilteringConfig(BaseModel):
+    enabled: bool = True
+
+
+class VectorSearchConfig(BaseModel):
+    enabled: bool = True
+    quantization: Literal["none", "halfvec", "scalar"] = "halfvec"
+    oversample_k: int = Field(gt=0, default=40)
+    similarity_threshold: float = Field(ge=0.0, le=1.0, default=0.7)
+
+
+class FtsConfig(BaseModel):
+    query_mode: Literal["standard", "phrase", "web"] = "web"
+
+
+class Bm25Config(BaseModel):
+    k1: float = Field(gt=0, default=1.5)
+    b: float = Field(ge=0.0, le=1.0, default=0.75)
+
+
+class KeywordSearchConfig(BaseModel):
+    enabled: bool = True
+    implementation: Literal["fts", "bm25"] = "fts"
+    top_k: int = Field(gt=0, default=20)
+    fts: FtsConfig = Field(default_factory=FtsConfig)
+    bm25: Bm25Config = Field(default_factory=Bm25Config)
+
+
+class FusionConfig(BaseModel):
+    implementation: Literal["rrf"] = "rrf"
+    rrf_k: int = Field(gt=0, default=60)
+    top_k: int = Field(gt=0, default=20)
+
+
+class RerankingConfig(BaseModel):
+    enabled: bool = False
+    model: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
+    top_k: int = Field(gt=0, default=5)
+
+
 class RetrievalConfig(BaseModel):
-    top_k: int = Field(gt=0)
-    similarity_threshold: float = Field(ge=0.0, le=1.0)
+    metadata_filtering: MetadataFilteringConfig = Field(default_factory=MetadataFilteringConfig)
+    vector_search: VectorSearchConfig = Field(default_factory=VectorSearchConfig)
+    keyword_search: KeywordSearchConfig = Field(default_factory=KeywordSearchConfig)
+    fusion: FusionConfig = Field(default_factory=FusionConfig)
+    reranking: RerankingConfig = Field(default_factory=RerankingConfig)
+    final_top_k: int = Field(gt=0, default=5)
+
+    @model_validator(mode="after")
+    def at_least_one_search_enabled(self) -> "RetrievalConfig":
+        if not self.vector_search.enabled and not self.keyword_search.enabled:
+            raise ValueError(
+                "At least one of vector_search or keyword_search must be enabled."
+            )
+        return self
+
+    @model_validator(mode="after")
+    def pipeline_stages_are_consistent(self) -> "RetrievalConfig":
+        if self.vector_search.enabled and self.vector_search.oversample_k < self.fusion.top_k:
+            raise ValueError(
+                f"vector_search.oversample_k ({self.vector_search.oversample_k}) must be "
+                f">= fusion.top_k ({self.fusion.top_k}): vector search cannot provide more "
+                "candidates than it fetches."
+            )
+        if self.reranking.enabled and self.reranking.top_k > self.fusion.top_k:
+            raise ValueError(
+                f"reranking.top_k ({self.reranking.top_k}) must be "
+                f"<= fusion.top_k ({self.fusion.top_k}): reranker cannot receive more "
+                "candidates than fusion produces."
+            )
+        if self.fusion.top_k < self.final_top_k:
+            raise ValueError(
+                f"fusion.top_k ({self.fusion.top_k}) must be >= final_top_k ({self.final_top_k}): "
+                "the pipeline cannot widen results after fusion."
+            )
+        return self
 
 
 class LoggingConfig(BaseModel):

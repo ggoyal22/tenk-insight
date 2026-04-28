@@ -18,3 +18,18 @@ class ChunksRepo(RelationalRepository[ChunkRecord]):
 
     @abstractmethod
     def insert_many(self, records: list[ChunkRecord], tx: Transaction | None = None) -> None: ...
+
+    @abstractmethod
+    def keyword_search(
+        self,
+        query: str,
+        top_k: int,
+        filing_ids: list[UUID] | None = None,
+        section: str | None = None,
+    ) -> list[tuple[UUID, float]]:
+        """Full-text search over chunk text using tsvector/tsquery.
+
+        Returns (chunk_id, ts_rank score) pairs ordered by relevance descending.
+        filing_ids and section are optional pre-filters applied before ranking.
+        """
+        ...

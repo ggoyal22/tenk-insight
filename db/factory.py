@@ -21,10 +21,13 @@ def create_db_client(config: AppConfig) -> DatabaseClient:
 def create_vector_store(config: AppConfig, client: DatabaseClient) -> VectorStore:
     engine = config.vector_store.engine
     if engine == "pgvector":
+        vs = config.retrieval.vector_search
         return PgvectorStore(
             client=client,
-            similarity_threshold=config.retrieval.similarity_threshold,
+            similarity_threshold=vs.similarity_threshold,
             distance_function=config.vector_index.distance_function,
+            embedding_dimension=config.embedding.dimension,
+            quantization=vs.quantization,
         )
     raise ValueError(f"Unsupported vector store engine: {engine!r}")
 

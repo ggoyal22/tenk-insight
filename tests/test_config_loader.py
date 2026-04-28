@@ -50,8 +50,8 @@ _requires_env_file = pytest.mark.skipif(
 
 def test_retrieval_valid_config():
     config = RetrievalConfig(**VALID_RETRIEVAL)
-    assert config.top_k == VALID_RETRIEVAL["top_k"]
-    assert config.similarity_threshold == VALID_RETRIEVAL["similarity_threshold"]
+    assert config.final_top_k == VALID_RETRIEVAL["final_top_k"]
+    assert config.vector_search.similarity_threshold == VALID_RETRIEVAL["vector_search"]["similarity_threshold"]
 
 
 def test_embedding_valid_config():
@@ -90,22 +90,24 @@ def test_edgar_valid_config():
 
 def test_retrieval_rejects_negative_top_k():
     with pytest.raises(ValidationError):
-        RetrievalConfig(**{**VALID_RETRIEVAL, "top_k": -1})
+        RetrievalConfig(**{**VALID_RETRIEVAL, "final_top_k": -1})
 
 
 def test_retrieval_rejects_zero_top_k():
     with pytest.raises(ValidationError):
-        RetrievalConfig(**{**VALID_RETRIEVAL, "top_k": 0})
+        RetrievalConfig(**{**VALID_RETRIEVAL, "final_top_k": 0})
 
 
 def test_retrieval_rejects_similarity_threshold_above_one():
+    overrides = {**VALID_RETRIEVAL, "vector_search": {**VALID_RETRIEVAL["vector_search"], "similarity_threshold": 1.5}}
     with pytest.raises(ValidationError):
-        RetrievalConfig(**{**VALID_RETRIEVAL, "similarity_threshold": 1.5})
+        RetrievalConfig(**overrides)
 
 
 def test_retrieval_rejects_negative_similarity_threshold():
+    overrides = {**VALID_RETRIEVAL, "vector_search": {**VALID_RETRIEVAL["vector_search"], "similarity_threshold": -0.1}}
     with pytest.raises(ValidationError):
-        RetrievalConfig(**{**VALID_RETRIEVAL, "similarity_threshold": -0.1})
+        RetrievalConfig(**overrides)
 
 
 # ---------------------------------------------------------------------------
