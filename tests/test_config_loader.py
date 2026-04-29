@@ -19,6 +19,8 @@ from config.loader import (
     DatabaseConfig,
     EdgarConfig,
     EmbeddingConfig,
+    GenerationConfig,
+    LLMConfig,
     LoggingConfig,
     RetrievalConfig,
     VectorIndexConfig,
@@ -31,6 +33,8 @@ from tests.conftest import (
     VALID_DATABASE,
     VALID_EDGAR,
     VALID_EMBEDDING,
+    VALID_GENERATION,
+    VALID_LLM,
     VALID_LOGGING,
     VALID_RETRIEVAL,
     VALID_VECTOR_INDEX,
@@ -279,8 +283,89 @@ def test_app_config_rejects_invalid_environment():
             chunking=ChunkingConfig(**VALID_CHUNKING),
             vector_index=VectorIndexConfig(**VALID_VECTOR_INDEX),
             retrieval=RetrievalConfig(**VALID_RETRIEVAL),
+            llm=LLMConfig(**VALID_LLM),
+            generation=GenerationConfig(**VALID_GENERATION),
             logging=LoggingConfig(**VALID_LOGGING),
         )
+
+
+# ---------------------------------------------------------------------------
+# LLMConfig validation
+# ---------------------------------------------------------------------------
+
+def test_llm_valid_config():
+    config = LLMConfig(**VALID_LLM)
+    assert config.provider == VALID_LLM["provider"]
+    assert config.model == VALID_LLM["model"]
+    assert config.base_url == VALID_LLM["base_url"]
+    assert config.api_key is None
+
+
+def test_llm_api_key_is_secret_str():
+    config = LLMConfig(**{**VALID_LLM, "api_key": "sk-secret-key"})
+    assert "sk-secret-key" not in str(config)
+    assert "sk-secret-key" not in repr(config)
+    assert config.api_key.get_secret_value() == "sk-secret-key"
+
+
+def test_llm_accepts_none_base_url():
+    config = LLMConfig(**{**VALID_LLM, "base_url": None})
+    assert config.base_url is None
+
+
+@pytest.mark.parametrize("invalid_provider", ["openai", "anthropic", "cohere", ""])
+def test_llm_rejects_invalid_provider(invalid_provider):
+    with pytest.raises(ValidationError):
+        LLMConfig(**{**VALID_LLM, "provider": invalid_provider})
+
+
+def test_llm_rejects_temperature_above_max():
+    with pytest.raises(ValidationError):
+        LLMConfig(**{**VALID_LLM, "temperature": 2.1})
+
+
+def test_llm_rejects_negative_temperature():
+    with pytest.raises(ValidationError):
+        LLMConfig(**{**VALID_LLM, "temperature": -0.1})
+
+
+def test_llm_rejects_zero_max_tokens():
+    with pytest.raises(ValidationError):
+        LLMConfig(**{**VALID_LLM, "max_tokens": 0})
+
+
+def test_llm_rejects_zero_timeout():
+    with pytest.raises(ValidationError):
+        LLMConfig(**{**VALID_LLM, "timeout": 0})
+
+
+# ---------------------------------------------------------------------------
+# GenerationConfig validation
+# ---------------------------------------------------------------------------
+
+def test_generation_valid_config():
+    config = GenerationConfig(**VALID_GENERATION)
+    assert config.hyde.enabled == VALID_GENERATION["hyde"]["enabled"]
+    assert config.reflection.max_iterations == VALID_GENERATION["reflection"]["max_iterations"]
+    assert config.multi_hop.max_hops == VALID_GENERATION["multi_hop"]["max_hops"]
+
+
+def test_generation_defaults_are_sensible():
+    config = GenerationConfig()
+    assert config.hyde.enabled is True
+    assert config.reflection.enabled is True
+    assert config.reflection.max_iterations > 0
+    assert config.multi_hop.max_hops > 0
+
+
+def test_generation_rejects_zero_max_iterations():
+    with pytest.raises(ValidationError):
+        GenerationConfig(**{**VALID_GENERATION, "reflection": {"enabled": True, "max_iterations": 0}})
+
+
+def test_generation_rejects_zero_max_hops():
+    with pytest.raises(ValidationError):
+        GenerationConfig(**{**VALID_GENERATION, "multi_hop": {"max_hops": 0}})
 
 
 # ---------------------------------------------------------------------------

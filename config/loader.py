@@ -166,6 +166,35 @@ class RetrievalConfig(BaseModel):
         return self
 
 
+class LLMConfig(BaseModel):
+    provider: Literal["ollama", "vllm", "claude"]
+    model: str
+    temperature: float = Field(ge=0.0, le=2.0, default=0.0)
+    max_tokens: int = Field(gt=0, default=2048)
+    timeout: int = Field(gt=0, default=120)
+    base_url: str | None = None         # from LLM_BASE_URL; None for cloud APIs that use the SDK default
+    api_key: SecretStr | None = None    # from LLM_API_KEY; None for local models
+
+
+class HydeConfig(BaseModel):
+    enabled: bool = True
+
+
+class ReflectionConfig(BaseModel):
+    enabled: bool = True
+    max_iterations: int = Field(gt=0, default=2)
+
+
+class MultiHopConfig(BaseModel):
+    max_hops: int = Field(gt=0, default=3)
+
+
+class GenerationConfig(BaseModel):
+    hyde: HydeConfig = Field(default_factory=HydeConfig)
+    reflection: ReflectionConfig = Field(default_factory=ReflectionConfig)
+    multi_hop: MultiHopConfig = Field(default_factory=MultiHopConfig)
+
+
 class LoggingConfig(BaseModel):
     level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
 
@@ -201,6 +230,8 @@ class AppConfig(BaseModel):
     chunking: ChunkingConfig
     vector_index: VectorIndexConfig
     retrieval: RetrievalConfig
+    llm: LLMConfig
+    generation: GenerationConfig
     logging: LoggingConfig
 
 
@@ -277,7 +308,7 @@ def _load() -> AppConfig:
         raise ValueError(f"config.yaml at {yaml_path} is empty or not valid YAML.")
 
     # Validate all required sections are present before accessing them
-    required_sections = ["database", "vector_store", "edgar", "embedding", "chunking", "vector_index", "retrieval", "logging"]
+    required_sections = ["database", "vector_store", "edgar", "embedding", "chunking", "vector_index", "retrieval", "llm", "generation", "logging"]
     missing = [s for s in required_sections if s not in yaml_data]
     if missing:
         raise ValueError(
@@ -306,6 +337,15 @@ def _load() -> AppConfig:
         "pool_size": _require_env_int("DB_POOL_SIZE"),
     }
 
+    llm_base_url = os.environ.get("LLM_BASE_URL") or None
+    llm_api_key = os.environ.get("LLM_API_KEY") or None
+
+    llm_data = {
+        **yaml_data["llm"],
+        "base_url": llm_base_url,
+        "api_key": llm_api_key,
+    }
+
     return AppConfig(
         environment=_require_env("ENVIRONMENT"),
         edgar=EdgarConfig(**edgar_data),
@@ -315,6 +355,8 @@ def _load() -> AppConfig:
         chunking=ChunkingConfig(**yaml_data["chunking"]),
         vector_index=VectorIndexConfig(**yaml_data["vector_index"]),
         retrieval=RetrievalConfig(**yaml_data["retrieval"]),
+        llm=LLMConfig(**llm_data),
+        generation=GenerationConfig(**yaml_data["generation"]),
         logging=LoggingConfig(**yaml_data["logging"]),
     )
 

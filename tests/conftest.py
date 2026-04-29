@@ -70,6 +70,22 @@ VALID_RETRIEVAL = {
     "final_top_k": 5,
 }
 
+VALID_LLM = {
+    "provider": "ollama",
+    "model": "llama3.1:8b",
+    "temperature": 0.0,
+    "max_tokens": 2048,
+    "timeout": 120,
+    "base_url": "http://localhost:11434",
+    "api_key": None,
+}
+
+VALID_GENERATION = {
+    "hyde": {"enabled": True},
+    "reflection": {"enabled": True, "max_iterations": 2},
+    "multi_hop": {"max_hops": 3},
+}
+
 VALID_LOGGING = {
     "level": "INFO",
 }
@@ -131,7 +147,7 @@ def db_client():
     conn.close()
 
     # apply schema to test DB
-    from config.loader import AppConfig, ChunkingConfig, EdgarConfig, EmbeddingConfig, LoggingConfig, RetrievalConfig, VectorIndexConfig, VectorStoreConfig
+    from config.loader import AppConfig, ChunkingConfig, EdgarConfig, EmbeddingConfig, GenerationConfig, LLMConfig, LoggingConfig, RetrievalConfig, VectorIndexConfig, VectorStoreConfig
     app_config = AppConfig(
         environment="test",
         edgar=EdgarConfig(**VALID_EDGAR),
@@ -141,6 +157,8 @@ def db_client():
         chunking=ChunkingConfig(**VALID_CHUNKING),
         vector_index=VectorIndexConfig(**VALID_VECTOR_INDEX),
         retrieval=RetrievalConfig(**VALID_RETRIEVAL),
+        llm=LLMConfig(**VALID_LLM),
+        generation=GenerationConfig(**VALID_GENERATION),
         logging=LoggingConfig(**VALID_LOGGING),
     )
     sql = _substitute(_SCHEMA_TEMPLATE.read_text(), app_config)

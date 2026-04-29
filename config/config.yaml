@@ -85,6 +85,26 @@ retrieval:
   final_top_k: 5                 # used when reranking is disabled
 
 
+# ── LLM ───────────────────────────────────────────────────────────────────────
+llm:
+  provider: "ollama"            # ollama / vllm / claude (base_url and api_key in .env)
+  model: "llama3.1:8b"
+  temperature: 0.0              # 0.0 for deterministic, reproducible answers
+  max_tokens: 2048
+  timeout: 120                  # seconds before the request is abandoned
+
+
+# ── Generation ────────────────────────────────────────────────────────────────
+generation:
+  hyde:
+    enabled: true               # generate a hypothetical passage to improve vector retrieval
+  reflection:
+    enabled: true               # re-evaluate answer quality and trigger extra retrieval if needed
+    max_iterations: 2
+  multi_hop:
+    max_hops: 3                 # max retrieval rounds before forcing an answer
+
+
 # ── Logging ───────────────────────────────────────────────────────────────────
 logging:
   level: "INFO"                 # DEBUG / INFO / WARNING / ERROR
