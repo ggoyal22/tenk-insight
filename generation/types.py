@@ -1,0 +1,79 @@
+import operator
+from dataclasses import dataclass
+from datetime import date
+from typing import Annotated, Literal, TypedDict
+
+from pydantic import BaseModel
+
+from llm.types import LLMUsage, Message
+from retrieval.types import MetadataFilter, RetrievalResult
+
+
+# ── Pydantic models — produced by the LLM via chat_structured() ──────────────
+# These must be BaseModel so chat_structured() can derive a JSON Schema from
+# them and parse the LLM's response back into typed objects.
+
+class RetrievalTask(BaseModel):
+    """A single retrieval request: a search query plus optional metadata filters."""
+    query: str
+    filter: MetadataFilter | None = None
+
+
+class QueryAnalysis(BaseModel):
+    """Structured output of the analyze_query node."""
+    query_type: Literal["single", "comparison", "time_series", "multi_hop", "out_of_scope"]
+    tasks: list[RetrievalTask]
+
+
+class HopDecision(BaseModel):
+    """Structured output of the check_hop node."""
+    done: bool
+    next_task: RetrievalTask | None = None
+
+
+class ReflectionDecision(BaseModel):
+    """Structured output of the reflect node."""
+    quality: Literal["high", "low"]
+    reason: str
+    next_task: RetrievalTask | None = None
+
+
+# ── Dataclasses — assembled by node code, never produced by the LLM ──────────
+
+@dataclass
+class Citation:
+    ticker: str
+    company_name: str
+    form_type: str
+    fiscal_year_end: date | None
+    filing_date: date
+    accession_number: str
+    source_url: str
+    section: str
+    chunk_text: str
+
+
+@dataclass
+class GenerationResult:
+    answer: str
+    citations: list[Citation]
+    usage: LLMUsage
+
+
+# ── LangGraph state ───────────────────────────────────────────────────────────
+
+class GenerationState(TypedDict):
+    query: str
+    history: list[Message]
+    # Renamed from 'filter' to avoid shadowing the Python builtin.
+    query_filter: MetadataFilter | None
+    query_type: str
+    pending_tasks: list[RetrievalTask]
+    hyde_query: str | None
+    # Reducer appends each retrieve node's result list — preserves which results
+    # came from which task so generate can build per-source citations.
+    completed_results: Annotated[list[list[RetrievalResult]], operator.add]
+    hop_count: int
+    reflection_count: int
+    retrieval_triggered_by: Literal["analysis", "check_hop", "reflect"]
+    answer: GenerationResult | None
