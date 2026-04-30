@@ -15,5 +15,6 @@ numpy~=1.26                 # float32 rescore in vector retrieval
 
 # LLM
 ollama~=0.4                 # Ollama Python SDK for local LLM inference
+openai~=1.0                 # OpenAI Python SDK
 langgraph~=1.1              # graph orchestration for multi-step generation pipeline
 

@@ -87,8 +87,8 @@ retrieval:
 
 # ── LLM ───────────────────────────────────────────────────────────────────────
 llm:
-  provider: "ollama"            # ollama / vllm / claude (base_url and api_key in .env)
-  model: "gemma4:e2b"
+  provider: "openai"            # ollama | openai (base_url and api_key in .env)
+  model: "gpt-4o-mini"
   temperature: 0.0              # 0.0 for deterministic, reproducible answers
   max_tokens: 2048
   timeout: 120                  # seconds before the request is abandoned

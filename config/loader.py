@@ -167,7 +167,7 @@ class RetrievalConfig(BaseModel):
 
 
 class LLMConfig(BaseModel):
-    provider: Literal["ollama"]  # extend as new providers are added to llm/factory.py
+    provider: Literal["ollama", "openai"]  # extend as new providers are added to llm/factory.py
     model: str
     temperature: float = Field(ge=0.0, le=2.0, default=0.0)
     max_tokens: int = Field(gt=0, default=2048)
