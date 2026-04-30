@@ -313,7 +313,7 @@ def test_llm_accepts_none_base_url():
     assert config.base_url is None
 
 
-@pytest.mark.parametrize("invalid_provider", ["openai", "anthropic", "cohere", ""])
+@pytest.mark.parametrize("invalid_provider", ["openai", "anthropic", "cohere", "vllm", "claude", ""])
 def test_llm_rejects_invalid_provider(invalid_provider):
     with pytest.raises(ValidationError):
         LLMConfig(**{**VALID_LLM, "provider": invalid_provider})

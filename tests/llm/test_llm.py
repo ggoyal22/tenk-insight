@@ -43,8 +43,9 @@ def test_build_llm_returns_ollama_instance():
 
 
 def test_build_llm_rejects_unknown_provider():
-    # vllm is a valid Literal in the config model but not yet registered in the factory
-    config = LLMConfig(**{**VALID_LLM, "provider": "vllm"})
+    # model_construct bypasses Pydantic validation to simulate a provider added to the
+    # Literal but not yet registered in the factory — the factory must still raise clearly.
+    config = LLMConfig.model_construct(**{**VALID_LLM, "provider": "vllm"})
     with pytest.raises(ValueError, match="vllm"):
         build_llm(config)
 

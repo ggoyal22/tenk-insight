@@ -60,7 +60,7 @@ retrieval:
     quantization: halfvec        # none | halfvec | scalar
     oversample_k: 40             # candidates fetched before float32 rescore
     # Similarity in [0, 1] — pgvector's <=> returns cosine DISTANCE; store converts: score = 1 - distance.
-    similarity_threshold: 0.7
+    similarity_threshold: 0.0
 
   keyword_search:
     enabled: true
@@ -88,7 +88,7 @@ retrieval:
 # ── LLM ───────────────────────────────────────────────────────────────────────
 llm:
   provider: "ollama"            # ollama / vllm / claude (base_url and api_key in .env)
-  model: "llama3.1:8b"
+  model: "gemma4:e2b"
   temperature: 0.0              # 0.0 for deterministic, reproducible answers
   max_tokens: 2048
   timeout: 120                  # seconds before the request is abandoned

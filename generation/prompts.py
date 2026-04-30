@@ -25,8 +25,8 @@ Query types:
 For each retrieval task, extract the most specific filter you can:
 - ticker: company ticker symbol (e.g. "NVDA") — only set if clearly stated in the query
 - form_type: always "10-K" unless the query explicitly requests a different filing type
-- fiscal_year_end: the fiscal year end date as YYYY-12-31 if a specific year is mentioned, otherwise null
-- section: the 10-K section most likely to contain the answer (e.g. "Risk Factors", "Management Discussion and Analysis", "Financial Statements") — null if unclear
+- fiscal_year_end: set ONLY when the user states an exact date or month (e.g. "ending January 2024" → 2024-01-31). When the user says "fiscal year 2024" or "in 2024" without a specific month, leave this null — companies have non-calendar fiscal years and an exact date match will miss them. The year in the query text is sufficient for retrieval.
+- section: always null — do not set this field. Section filtering is handled internally.
 
 For comparison queries, create one task per company.
 For time_series queries, create one task per year mentioned (or a single broad task if no years are specified).
@@ -92,7 +92,7 @@ Return done: false with a next_task if specific information is still missing.
 
 When providing next_task:
 - query: a precise search query targeting only the missing information
-- filter: narrow the search as specifically as possible (ticker, fiscal_year_end, section)
+- filter: narrow the search as specifically as possible (ticker, fiscal_year_end) — do not set section
 
 Be conservative — only request further retrieval if it is clearly necessary. Do not request information that is already present in the current context."""
 
@@ -111,6 +111,6 @@ Return quality: "low" if either fails, along with:
 - reason: a concise explanation of what is wrong
 - next_task: a retrieval task that would obtain the missing or unverified information
   - query: target the specific gap
-  - filter: narrow as specifically as possible
+  - filter: narrow as specifically as possible (ticker, fiscal_year_end) — do not set section
 
 Be strict but fair. Minor omissions are acceptable if the core question is answered and every stated fact is grounded in the context."""

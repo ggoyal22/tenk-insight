@@ -16,6 +16,8 @@ from config.loader import (
     DatabaseConfig,
     EdgarConfig,
     EmbeddingConfig,
+    GenerationConfig,
+    LLMConfig,
     LoggingConfig,
     RetrievalConfig,
     VectorIndexConfig,
@@ -27,6 +29,8 @@ from tests.conftest import (
     VALID_DATABASE,
     VALID_EDGAR,
     VALID_EMBEDDING,
+    VALID_GENERATION,
+    VALID_LLM,
     VALID_LOGGING,
     VALID_RETRIEVAL,
     VALID_VECTOR_INDEX,
@@ -47,6 +51,8 @@ def _make_config(**vector_index_overrides) -> AppConfig:
         chunking=ChunkingConfig(**VALID_CHUNKING),
         vector_index=VectorIndexConfig(**{**VALID_VECTOR_INDEX, **vector_index_overrides}),
         retrieval=RetrievalConfig(**VALID_RETRIEVAL),
+        llm=LLMConfig(**VALID_LLM),
+        generation=GenerationConfig(**VALID_GENERATION),
         logging=LoggingConfig(**VALID_LOGGING),
     )
 
