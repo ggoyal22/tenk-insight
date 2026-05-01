@@ -108,3 +108,8 @@ generation:
 # ── Logging ───────────────────────────────────────────────────────────────────
 logging:
   level: "INFO"                 # DEBUG / INFO / WARNING / ERROR
+
+
+# ── Tracing ───────────────────────────────────────────────────────────────────
+tracing:
+  enabled: true                 # set true to export traces (requires OTEL_EXPORTER_OTLP_ENDPOINT in .env)

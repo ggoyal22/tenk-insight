@@ -10,11 +10,17 @@ pgvector~=0.2          # pgvector Python client for VECTOR type support
 # ETL
 edgartools~=5.30       # SEC EDGAR filing download and HTML parsing
 tiktoken~=0.7          # token counting for chunk sizing (cl100k_base encoding)
-sentence-transformers~=3.0  # local embedding model runner + cross-encoder reranker
+sentence-transformers~=5.0  # local embedding model runner + cross-encoder reranker
 numpy~=1.26                 # float32 rescore in vector retrieval
 
 # LLM
 ollama~=0.4                 # Ollama Python SDK for local LLM inference
 openai~=1.0                 # OpenAI Python SDK
 langgraph~=1.1              # graph orchestration for multi-step generation pipeline
+
+# Tracing
+opentelemetry-sdk~=1.0                          # OTel SDK — tracer provider and span processor
+opentelemetry-exporter-otlp-proto-http~=1.0     # OTLP/HTTP exporter; reads OTEL_EXPORTER_OTLP_ENDPOINT automatically
+openinference-instrumentation-langchain~=0.1    # auto-instruments LangGraph node transitions
+openinference-semantic-conventions~=0.1         # semantic conventions for LLM span attributes
 

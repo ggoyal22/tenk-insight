@@ -23,6 +23,7 @@ class OllamaLLM(BaseLLM):
                 "LLM_BASE_URL must be set in .env when using the Ollama provider."
             )
         self._client = Client(host=config.base_url, timeout=config.timeout)
+        self._provider = _PROVIDER
         self._model = config.model
         self._options = {
             "temperature": config.temperature,

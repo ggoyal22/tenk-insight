@@ -10,6 +10,7 @@ from etl.factory import create_embedder
 from generation.factory import build_generation_pipeline, make_initial_state
 from generation.types import Citation
 from llm.types import Message
+from tracing.setup import setup_tracing
 
 
 def _format_citations(citations: list[Citation]) -> str:
@@ -36,6 +37,12 @@ def main() -> None:
         format="%(asctime)s %(levelname)s %(name)s — %(message)s",
         datefmt="%Y-%m-%dT%H:%M:%S",
     )
+
+    try:
+        setup_tracing(config.tracing)
+    except RuntimeError as exc:
+        sys.stderr.write(f"CRITICAL — Failed to initialise tracing: {exc}\n")
+        sys.exit(1)
 
     client = create_db_client(config)
     if not client.health_check():

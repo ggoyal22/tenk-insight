@@ -199,6 +199,19 @@ class LoggingConfig(BaseModel):
     level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
 
 
+class TracingConfig(BaseModel):
+    enabled: bool = False
+
+    @model_validator(mode="after")
+    def endpoint_required_when_enabled(self) -> "TracingConfig":
+        if self.enabled and not os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT"):
+            raise ValueError(
+                "OTEL_EXPORTER_OTLP_ENDPOINT must be set in .env when tracing.enabled is true. "
+                "See .env.example for the expected format."
+            )
+        return self
+
+
 # ---------------------------------------------------------------------------
 # Model for .env values
 # ---------------------------------------------------------------------------
@@ -233,6 +246,7 @@ class AppConfig(BaseModel):
     llm: LLMConfig
     generation: GenerationConfig
     logging: LoggingConfig
+    tracing: TracingConfig = Field(default_factory=TracingConfig)
 
 
 # ---------------------------------------------------------------------------
@@ -358,6 +372,7 @@ def _load() -> AppConfig:
         llm=LLMConfig(**llm_data),
         generation=GenerationConfig(**yaml_data["generation"]),
         logging=LoggingConfig(**yaml_data["logging"]),
+        tracing=TracingConfig(**yaml_data.get("tracing", {})),
     )
 
 

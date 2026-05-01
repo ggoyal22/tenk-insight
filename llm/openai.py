@@ -26,6 +26,7 @@ class OpenAILLM(BaseLLM):
             base_url=config.base_url or None,
             timeout=config.timeout,
         )
+        self._provider = _PROVIDER
         self._model = config.model
         self._params = {
             "temperature": config.temperature,
