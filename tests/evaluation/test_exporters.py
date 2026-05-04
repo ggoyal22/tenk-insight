@@ -133,7 +133,7 @@ def test_phoenix_skips_export_when_no_scores(tmp_path):
 
     with sqlite3.connect(db_path) as conn:
         tables = conn.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name='span_annotations'"
+            "SELECT name FROM sqlite_master WHERE type='table'"
         ).fetchall()
     assert tables == []
 
@@ -153,7 +153,24 @@ def test_phoenix_upserts_on_duplicate(tmp_path):
     assert rows[0][0] == pytest.approx(0.9)
 
 
-def test_phoenix_stores_run_id(tmp_path):
+def test_phoenix_stores_run_metadata(tmp_path):
+    db_path = _make_db(tmp_path)
+    exporter = PhoenixTraceAnnotationExporter(db_path)
+    result = _run_result(run_id="run-abc", git_sha="deadbeef", golden_used=True)
+    exporter.export(result, [_sample("s1")], _evaluation([{"faithfulness": 0.8}]))
+
+    with sqlite3.connect(db_path) as conn:
+        row = conn.execute(
+            "SELECT run_id, git_sha, extractor, evaluator, golden_used FROM evaluation_runs"
+        ).fetchone()
+    assert row[0] == "run-abc"
+    assert row[1] == "deadbeef"
+    assert row[2] == "phoenix"
+    assert row[3] == "ragas"
+    assert row[4] == 1  # golden_used=True stored as INTEGER 1
+
+
+def test_phoenix_run_id_links_annotations_to_run(tmp_path):
     db_path = _make_db(tmp_path)
     exporter = PhoenixTraceAnnotationExporter(db_path)
     exporter.export(_run_result(run_id="run-abc"), [_sample("s1")], _evaluation([{"faithfulness": 0.8}]))
@@ -161,3 +178,14 @@ def test_phoenix_stores_run_id(tmp_path):
     with sqlite3.connect(db_path) as conn:
         run_id = conn.execute("SELECT run_id FROM span_annotations").fetchone()[0]
     assert run_id == "run-abc"
+
+
+def test_phoenix_writes_one_evaluation_run_row_per_run(tmp_path):
+    db_path = _make_db(tmp_path)
+    exporter = PhoenixTraceAnnotationExporter(db_path)
+    exporter.export(_run_result(run_id="run-1"), [_sample("s1")], _evaluation([{"faithfulness": 0.8}]))
+    exporter.export(_run_result(run_id="run-2"), [_sample("s2")], _evaluation([{"faithfulness": 0.9}]))
+
+    with sqlite3.connect(db_path) as conn:
+        count = conn.execute("SELECT COUNT(*) FROM evaluation_runs").fetchone()[0]
+    assert count == 2
