@@ -113,3 +113,33 @@ logging:
 # ── Tracing ───────────────────────────────────────────────────────────────────
 tracing:
   enabled: true                 # set true to export traces (requires OTEL_EXPORTER_OTLP_ENDPOINT in .env)
+
+
+# ── Evaluation ────────────────────────────────────────────────────────────────
+evaluation:
+  extractor:
+    backend: phoenix            # reads PHOENIX_DB_PATH from .env
+
+  evaluator:
+    backend: ragas
+    judge_llm:
+      provider: openai          # LLM used by RAGAS to score answers — independent of the pipeline LLM
+      model: gpt-4o-mini
+
+  metrics:
+    - faithfulness
+    - answer_relevancy
+    - context_precision
+    - context_recall            # skipped automatically when golden_path is not set
+
+  datasets:                     # query_type groups to evaluate; empty group → warning, not error
+    - single
+    - multi_hop
+    - comparison
+
+  # golden_path: data/golden/questions.yaml  # uncomment to enable reference-required metrics
+  golden_path: null
+
+  results:
+    phoenix_annotations: true   # write per-trace scores back to Phoenix as span annotations
+    results_dir: data/eval_results  # aggregate run history written here as runs.jsonl

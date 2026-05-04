@@ -104,6 +104,25 @@ VALID_VECTOR_STORE = {
     "engine": "pgvector",
 }
 
+VALID_EVALUATION = {
+    "extractor": {"backend": "phoenix"},
+    "evaluator": {
+        "backend": "ragas",
+        "judge_llm": {
+            "provider": "openai",
+            "model": "gpt-4o-mini",
+            "api_key": None,
+        },
+    },
+    "metrics": ["faithfulness", "answer_relevancy"],
+    "datasets": ["single"],
+    "golden_path": None,
+    "results": {
+        "phoenix_annotations": False,
+        "results_dir": "/tmp/eval_results",
+    },
+}
+
 # ---------------------------------------------------------------------------
 # Integration test fixtures
 # ---------------------------------------------------------------------------

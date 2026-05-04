@@ -2,15 +2,21 @@
 Config loader for the SEC EDGAR RAG system.
 
 Reads config/config.yaml for tunable parameters and .env for environment-specific
-values (DB credentials). Returns a validated, typed AppConfig instance.
+values (DB credentials, API keys). Returns validated, typed config instances.
+
+Two entry points for two separate pipelines:
+    load_config()      — query/execution phase (ingestion, retrieval, generation)
+    load_eval_config() — evaluation phase (trace extraction, RAGAS scoring, result output)
 
 Usage:
-    from config.loader import load_config, ensure_directories
+    from config.loader import load_config, load_eval_config, ensure_directories
 
     config = load_config()
-    ensure_directories(config)   # call once at application startup
+    ensure_directories(config)   # call once at startup
     print(config.embedding.model)
-    print(config.database.host)
+
+    eval_cfg = load_eval_config()
+    print(eval_cfg.evaluator.judge_llm.model)
 """
 
 import os
@@ -213,6 +219,57 @@ class TracingConfig(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Models for evaluation config (evaluation phase only — not part of AppConfig)
+# ---------------------------------------------------------------------------
+
+class JudgeLLMConfig(BaseModel):
+    provider: Literal["openai", "anthropic"] = "openai"
+    model: str = "gpt-4o-mini"
+    api_key: SecretStr | None = None  # from JUDGE_LLM_API_KEY in .env
+
+
+class ExtractorConfig(BaseModel):
+    backend: Literal["phoenix"] = "phoenix"
+
+
+class EvaluatorConfig(BaseModel):
+    backend: Literal["ragas"] = "ragas"
+    judge_llm: JudgeLLMConfig = Field(default_factory=JudgeLLMConfig)
+
+
+class ResultsConfig(BaseModel):
+    phoenix_annotations: bool = False
+    results_dir: str = "data/eval_results"
+
+
+class EvaluationConfig(BaseModel):
+    extractor: ExtractorConfig = Field(default_factory=ExtractorConfig)
+    evaluator: EvaluatorConfig = Field(default_factory=EvaluatorConfig)
+    metrics: list[str] = Field(
+        default_factory=lambda: [
+            "faithfulness",
+            "answer_relevancy",
+            "context_precision",
+            "context_recall",
+        ]
+    )
+    datasets: list[str] = Field(default_factory=lambda: ["single", "multi_hop", "comparison"])
+    # golden_path=None → reference-required metrics (context_recall, answer_correctness)
+    # are skipped automatically; set to a YAML file path to enable them
+    golden_path: str | None = None
+    results: ResultsConfig = Field(default_factory=ResultsConfig)
+
+    @model_validator(mode="after")
+    def phoenix_db_path_required(self) -> "EvaluationConfig":
+        if self.extractor.backend == "phoenix" and not os.environ.get("PHOENIX_DB_PATH"):
+            raise ValueError(
+                "PHOENIX_DB_PATH must be set in .env when extractor.backend is 'phoenix'. "
+                "See .env.example for the expected format."
+            )
+        return self
+
+
+# ---------------------------------------------------------------------------
 # Model for .env values
 # ---------------------------------------------------------------------------
 
@@ -384,3 +441,42 @@ def load_config() -> AppConfig:
     to force a fresh load.
     """
     return _load()
+
+
+def _load_eval() -> EvaluationConfig:
+    """Read config.yaml and .env, extract the evaluation block, and return EvaluationConfig."""
+    env_path = _PROJECT_ROOT / ".env"
+    if env_path.exists():
+        load_dotenv(env_path)
+
+    yaml_path = _PROJECT_ROOT / "config" / "config.yaml"
+    if not yaml_path.exists():
+        raise FileNotFoundError(f"config.yaml not found at {yaml_path}.")
+    with open(yaml_path) as f:
+        yaml_data: dict = yaml.safe_load(f)
+
+    if not isinstance(yaml_data, dict):
+        raise ValueError(f"config.yaml at {yaml_path} is empty or not valid YAML.")
+
+    eval_yaml = yaml_data.get("evaluation", {})
+
+    # Inject JUDGE_LLM_API_KEY from env into the nested judge_llm config,
+    # parallel to how LLM_API_KEY is injected into LLMConfig in _load().
+    judge_llm_data = {
+        **eval_yaml.get("evaluator", {}).get("judge_llm", {}),
+        "api_key": os.environ.get("JUDGE_LLM_API_KEY") or None,
+    }
+    evaluator_data = {**eval_yaml.get("evaluator", {}), "judge_llm": judge_llm_data}
+    eval_final = {**eval_yaml, "evaluator": evaluator_data}
+
+    return EvaluationConfig(**eval_final)
+
+
+@lru_cache(maxsize=1)
+def load_eval_config() -> EvaluationConfig:
+    """
+    Load and return the evaluation config. Results are cached — files are
+    read exactly once per process. Call load_eval_config.cache_clear() in tests
+    to force a fresh load.
+    """
+    return _load_eval()

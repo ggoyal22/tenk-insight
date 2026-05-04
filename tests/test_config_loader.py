@@ -19,20 +19,27 @@ from config.loader import (
     DatabaseConfig,
     EdgarConfig,
     EmbeddingConfig,
+    EvaluationConfig,
+    EvaluatorConfig,
+    ExtractorConfig,
     GenerationConfig,
+    JudgeLLMConfig,
     LLMConfig,
     LoggingConfig,
+    ResultsConfig,
     RetrievalConfig,
     VectorIndexConfig,
     _require_env,
     _require_env_int,
     load_config,
+    load_eval_config,
 )
 from tests.conftest import (
     VALID_CHUNKING,
     VALID_DATABASE,
     VALID_EDGAR,
     VALID_EMBEDDING,
+    VALID_EVALUATION,
     VALID_GENERATION,
     VALID_LLM,
     VALID_LOGGING,
@@ -401,3 +408,94 @@ def test_load_config_returns_same_instance():
             assert config_a.embedding.model == "BAAI/bge-large-en-v1.5"
     finally:
         load_config.cache_clear()
+
+
+# ---------------------------------------------------------------------------
+# EvaluationConfig validation
+# ---------------------------------------------------------------------------
+
+def test_evaluation_valid_config(monkeypatch):
+    monkeypatch.setenv("PHOENIX_DB_PATH", "/tmp/test.db")
+    config = EvaluationConfig(**VALID_EVALUATION)
+    assert config.extractor.backend == "phoenix"
+    assert config.evaluator.backend == "ragas"
+    assert config.evaluator.judge_llm.provider == "openai"
+    assert config.golden_path is None
+    assert config.results.phoenix_annotations is False
+
+
+def test_evaluation_defaults_are_sensible(monkeypatch):
+    monkeypatch.setenv("PHOENIX_DB_PATH", "/tmp/test.db")
+    config = EvaluationConfig()
+    assert config.extractor.backend == "phoenix"
+    assert config.evaluator.backend == "ragas"
+    assert "faithfulness" in config.metrics
+    assert "context_recall" in config.metrics
+    assert "single" in config.datasets
+    assert config.golden_path is None
+    assert config.results.results_dir == "data/eval_results"
+
+
+def test_evaluation_requires_phoenix_db_path(monkeypatch):
+    monkeypatch.delenv("PHOENIX_DB_PATH", raising=False)
+    with pytest.raises(ValidationError, match="PHOENIX_DB_PATH"):
+        EvaluationConfig(**VALID_EVALUATION)
+
+
+def test_evaluation_rejects_invalid_extractor_backend(monkeypatch):
+    monkeypatch.setenv("PHOENIX_DB_PATH", "/tmp/test.db")
+    with pytest.raises(ValidationError):
+        EvaluationConfig(**{**VALID_EVALUATION, "extractor": {"backend": "datadog"}})
+
+
+def test_evaluation_rejects_invalid_evaluator_backend(monkeypatch):
+    monkeypatch.setenv("PHOENIX_DB_PATH", "/tmp/test.db")
+    with pytest.raises(ValidationError):
+        EvaluationConfig(**{**VALID_EVALUATION, "evaluator": {"backend": "deepeval"}})
+
+
+def test_evaluation_rejects_invalid_judge_llm_provider(monkeypatch):
+    monkeypatch.setenv("PHOENIX_DB_PATH", "/tmp/test.db")
+    invalid_evaluator = {**VALID_EVALUATION["evaluator"], "judge_llm": {"provider": "ollama", "model": "llama3"}}
+    with pytest.raises(ValidationError):
+        EvaluationConfig(**{**VALID_EVALUATION, "evaluator": invalid_evaluator})
+
+
+def test_evaluation_judge_llm_api_key_is_secret_str(monkeypatch):
+    monkeypatch.setenv("PHOENIX_DB_PATH", "/tmp/test.db")
+    evaluator = {**VALID_EVALUATION["evaluator"], "judge_llm": {**VALID_EVALUATION["evaluator"]["judge_llm"], "api_key": "sk-secret"}}
+    config = EvaluationConfig(**{**VALID_EVALUATION, "evaluator": evaluator})
+    assert "sk-secret" not in str(config)
+    assert "sk-secret" not in repr(config)
+    assert config.evaluator.judge_llm.api_key.get_secret_value() == "sk-secret"
+
+
+def test_evaluation_golden_path_none_is_valid(monkeypatch):
+    monkeypatch.setenv("PHOENIX_DB_PATH", "/tmp/test.db")
+    config = EvaluationConfig(**{**VALID_EVALUATION, "golden_path": None})
+    assert config.golden_path is None
+
+
+def test_evaluation_golden_path_string_is_accepted(monkeypatch):
+    monkeypatch.setenv("PHOENIX_DB_PATH", "/tmp/test.db")
+    config = EvaluationConfig(**{**VALID_EVALUATION, "golden_path": "data/golden/questions.yaml"})
+    assert config.golden_path == "data/golden/questions.yaml"
+
+
+# ---------------------------------------------------------------------------
+# load_eval_config cache behaviour
+# ---------------------------------------------------------------------------
+
+@_requires_env_file
+def test_load_eval_config_returns_same_instance(monkeypatch):
+    monkeypatch.setenv("PHOENIX_DB_PATH", "/tmp/test.db")
+    monkeypatch.setenv("JUDGE_LLM_API_KEY", "sk-test-key")
+    load_eval_config.cache_clear()
+    try:
+        with patch.dict(os.environ, {}, clear=False):
+            config_a = load_eval_config()
+            config_b = load_eval_config()
+            assert config_a is config_b
+            assert config_a.evaluator.judge_llm.model == "gpt-4o-mini"
+    finally:
+        load_eval_config.cache_clear()
