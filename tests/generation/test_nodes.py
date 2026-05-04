@@ -285,6 +285,37 @@ def test_generate_deduplicates_citations():
     assert len(output["answer"].citations) == 1
 
 
+def test_generate_orders_high_frequency_chunks_first_in_context():
+    llm = _make_llm(chat_return=LLMResponse(content="Answer.", usage=_make_usage()))
+    filing = _make_filing()
+
+    high_freq_parent = ParentChunkRecord(
+        id=uuid.uuid4(), filing_id=filing.id, chunk_index=0, section="s1",
+        text="HIGH FREQUENCY CHUNK", token_count=3, content_hash="a" * 64,
+        created_at=datetime(2024, 3, 1),
+    )
+    low_freq_parent = ParentChunkRecord(
+        id=uuid.uuid4(), filing_id=filing.id, chunk_index=1, section="s2",
+        text="LOW FREQUENCY CHUNK", token_count=3, content_hash="b" * 64,
+        created_at=datetime(2024, 3, 1),
+    )
+    high_freq_result = RetrievalResult(
+        score=0.9, chunk=_make_chunk(filing.id, high_freq_parent.id),
+        parent_chunk=high_freq_parent, filing=filing,
+    )
+    low_freq_result = RetrievalResult(
+        score=0.9, chunk=_make_chunk(filing.id, low_freq_parent.id),
+        parent_chunk=low_freq_parent, filing=filing,
+    )
+
+    node = make_generate(llm)
+    # high_freq_result appears in both hops, low_freq_result in only one
+    output = node(_base_state(completed_results=[[high_freq_result, low_freq_result], [high_freq_result]]))
+
+    context = llm.chat.call_args[0][0][-1].content
+    assert context.index("HIGH FREQUENCY CHUNK") < context.index("LOW FREQUENCY CHUNK")
+
+
 @pytest.mark.parametrize("query_type,expected_keyword", [
     ("single", "Answer the question"),
     ("multi_hop", "Answer the question"),

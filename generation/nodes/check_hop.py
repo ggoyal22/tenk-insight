@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 def make_check_hop(llm: BaseLLM, config: GenerationConfig) -> Callable[[GenerationState], dict]:
     def check_hop(state: GenerationState) -> dict:
-        context = build_context(state["completed_results"])
+        context = build_context([r for group in state["completed_results"] for r in group])
         messages = [
             Message(role="system", content=CHECK_HOP_PROMPT),
             Message(

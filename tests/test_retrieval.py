@@ -1,7 +1,7 @@
 """Unit tests for retrieval components — no database required."""
 
 from datetime import date, datetime, timezone
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 from uuid import UUID, uuid4
 
 import pytest
@@ -9,8 +9,9 @@ import pytest
 from config.loader import FusionConfig, KeywordSearchConfig, RetrievalConfig, RerankingConfig, VectorSearchConfig
 from db.models import ChunkRecord, FilingRecord, ParentChunkRecord
 from retrieval.fusion.rrf import RRFFusion
+from retrieval.reranker.cross_encoder import CrossEncoderReranker
 from retrieval.retriever import Retriever
-from retrieval.types import MetadataFilter
+from retrieval.types import MetadataFilter, RetrievalResult
 
 
 def _ids(*n: int) -> list[UUID]:
@@ -202,3 +203,61 @@ class TestRetrieverModes:
         results = retriever.retrieve(query="GPU", query_embedding=[0.1] * 8)
 
         assert len(results) == 2
+
+
+# ── CrossEncoderReranker tests ────────────────────────────────────────────────
+
+class TestCrossEncoderReranker:
+    def _make_result(self, parent_id: UUID) -> RetrievalResult:
+        filing_id = uuid4()
+        filing = _filing_record(filing_id)
+        parent = _parent_record(parent_id, filing_id)
+        chunk = _chunk_record(uuid4(), filing_id, parent_id)
+        return RetrievalResult(score=0.5, chunk=chunk, parent_chunk=parent, filing=filing)
+
+    @patch("retrieval.reranker.cross_encoder.CrossEncoder")
+    def test_rerank_sorts_by_score_descending(self, MockCE):
+        mock_model = MagicMock()
+        mock_model.predict.return_value.tolist.return_value = [0.3, 0.9, 0.6]
+        MockCE.return_value = mock_model
+
+        reranker = CrossEncoderReranker("mock-model")
+        results = [self._make_result(uuid4()) for _ in range(3)]
+        ranked = reranker.rerank("test query", results, top_k=3)
+
+        scores = [r.score for r in ranked]
+        assert scores == sorted(scores, reverse=True)
+
+    @patch("retrieval.reranker.cross_encoder.CrossEncoder")
+    def test_rerank_deduplicates_by_parent_chunk_id(self, MockCE):
+        mock_model = MagicMock()
+        mock_model.predict.return_value.tolist.return_value = [0.8]
+        MockCE.return_value = mock_model
+
+        reranker = CrossEncoderReranker("mock-model")
+        shared_parent_id = uuid4()
+        results = [self._make_result(shared_parent_id), self._make_result(shared_parent_id)]
+
+        ranked = reranker.rerank("test query", results, top_k=2)
+
+        pairs_scored = mock_model.predict.call_args[0][0]
+        assert len(pairs_scored) == 1
+        assert len(ranked) == 1
+
+    @patch("retrieval.reranker.cross_encoder.CrossEncoder")
+    def test_rerank_respects_top_k(self, MockCE):
+        mock_model = MagicMock()
+        mock_model.predict.return_value.tolist.return_value = [0.9, 0.7, 0.5]
+        MockCE.return_value = mock_model
+
+        reranker = CrossEncoderReranker("mock-model")
+        results = [self._make_result(uuid4()) for _ in range(3)]
+        ranked = reranker.rerank("test query", results, top_k=2)
+
+        assert len(ranked) == 2
+
+    @patch("retrieval.reranker.cross_encoder.CrossEncoder")
+    def test_rerank_empty_returns_empty(self, MockCE):
+        MockCE.return_value = MagicMock()
+        reranker = CrossEncoderReranker("mock-model")
+        assert reranker.rerank("query", [], top_k=5) == []

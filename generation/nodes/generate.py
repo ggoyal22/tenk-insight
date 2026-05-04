@@ -1,5 +1,6 @@
 import logging
 from collections.abc import Callable
+from uuid import UUID
 
 from llm.base import BaseLLM
 from llm.types import Message
@@ -14,7 +15,8 @@ logger = logging.getLogger(__name__)
 def make_generate(llm: BaseLLM) -> Callable[[GenerationState], dict]:
     def generate(state: GenerationState) -> dict:
         prompt = _select_prompt(state["query_type"])
-        context = build_context(state["completed_results"])
+        results = _deduplicate(state["completed_results"])
+        context = build_context(results)
 
         messages = [Message(role="system", content=prompt)]
         for msg in (state.get("history") or []):
@@ -25,7 +27,7 @@ def make_generate(llm: BaseLLM) -> Callable[[GenerationState], dict]:
         ))
 
         response = llm.chat(messages)
-        citations = _build_citations(state["completed_results"])
+        citations = _build_citations(results)
 
         logger.debug(
             "Answer generated (%d chars, %d citation(s)).",
@@ -49,27 +51,35 @@ def _select_prompt(query_type: str) -> str:
     return QA_PROMPT  # single, multi_hop
 
 
-def _build_citations(completed_results: list[list[RetrievalResult]]) -> list[Citation]:
-    seen: set[tuple] = set()
-    citations: list[Citation] = []
+def _deduplicate(completed_results: list[list[RetrievalResult]]) -> list[RetrievalResult]:
+    """Flatten multi-hop results, deduplicate by parent_chunk.id, sort by hop frequency descending.
+
+    Chunks retrieved across more hops appear first — mitigates Lost-in-the-Middle
+    by placing the most corroborated evidence at the top of the LLM context.
+    """
+    frequency: dict[UUID, int] = {}
+    unique: dict[UUID, RetrievalResult] = {}
     for result_group in completed_results:
         for r in result_group:
-            f = r.filing
-            # Deduplicate by accession number + section — same passage cited multiple
-            # times across hops should only appear once in the citation list.
-            key = (f.accession_number, r.parent_chunk.section)
-            if key in seen:
-                continue
-            seen.add(key)
-            citations.append(Citation(
-                ticker=f.ticker,
-                company_name=f.company_name,
-                form_type=f.form_type,
-                fiscal_year_end=f.fiscal_year_end,
-                filing_date=f.filing_date,
-                accession_number=f.accession_number,
-                source_url=f.source_url,
-                section=r.parent_chunk.section,
-                chunk_text=r.parent_chunk.text,
-            ))
-    return citations
+            pid = r.parent_chunk.id
+            frequency[pid] = frequency.get(pid, 0) + 1
+            if pid not in unique:
+                unique[pid] = r
+    return sorted(unique.values(), key=lambda r: frequency[r.parent_chunk.id], reverse=True)
+
+
+def _build_citations(results: list[RetrievalResult]) -> list[Citation]:
+    return [
+        Citation(
+            ticker=r.filing.ticker,
+            company_name=r.filing.company_name,
+            form_type=r.filing.form_type,
+            fiscal_year_end=r.filing.fiscal_year_end,
+            filing_date=r.filing.filing_date,
+            accession_number=r.filing.accession_number,
+            source_url=r.filing.source_url,
+            section=r.parent_chunk.section,
+            chunk_text=r.parent_chunk.text,
+        )
+        for r in results
+    ]

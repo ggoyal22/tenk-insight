@@ -1,5 +1,6 @@
 import dataclasses
 import logging
+from uuid import UUID
 
 from sentence_transformers import CrossEncoder
 
@@ -30,11 +31,17 @@ class CrossEncoderReranker(BaseReranker):
         if not results:
             return []
 
-        # Use parent chunk text as context for the LLM — same text sent to LLM.
-        pairs = [(query, r.parent_chunk.text) for r in results]
+        seen: set[UUID] = set()
+        unique_results: list[RetrievalResult] = []
+        for r in results:
+            if r.parent_chunk.id not in seen:
+                seen.add(r.parent_chunk.id)
+                unique_results.append(r)
+
+        pairs = [(query, r.parent_chunk.text) for r in unique_results]
         scores: list[float] = self._model.predict(pairs).tolist()
 
-        ranked = sorted(zip(results, scores), key=lambda x: x[1], reverse=True)
+        ranked = sorted(zip(unique_results, scores), key=lambda x: x[1], reverse=True)
 
         return [
             dataclasses.replace(result, score=float(score))
