@@ -10,6 +10,12 @@ from dataclasses import dataclass, field
 
 
 @dataclass
+class EvaluationResult:
+    scores: list[dict[str, float]]  # one score dict per EvalSample; used for Phoenix span annotations
+    aggregate: dict[str, float]     # mean of scores across all samples; used by DatasetScores
+
+
+@dataclass
 class EvalSample:
     trace_id:            str
     query_type:          str

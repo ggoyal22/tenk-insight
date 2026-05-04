@@ -24,7 +24,7 @@ from ragas.metrics.collections import (
 
 from config.loader import JudgeLLMConfig
 from evaluation.evaluators.base import BaseEvaluator
-from evaluation.types import EvalSample
+from evaluation.types import EvalSample, EvaluationResult
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +42,7 @@ class RagasEvaluator(BaseEvaluator):
     def __init__(self, judge_llm_config: JudgeLLMConfig) -> None:
         self._judge_llm_config = judge_llm_config
 
-    def evaluate(self, samples: list[EvalSample], metrics: list[str]) -> dict[str, float]:
+    def evaluate(self, samples: list[EvalSample], metrics: list[str]) -> EvaluationResult:
         unknown = [m for m in metrics if m not in _METRIC_REGISTRY]
         if unknown:
             raise ValueError(
@@ -52,7 +52,7 @@ class RagasEvaluator(BaseEvaluator):
 
         if not samples:
             logger.warning("No samples provided — skipping evaluation")
-            return {}
+            return EvaluationResult(scores=[], aggregate={})
 
         has_reference = any(s.reference is not None for s in samples)
         active_metrics = []
@@ -66,7 +66,7 @@ class RagasEvaluator(BaseEvaluator):
 
         if not active_metrics:
             logger.warning("No active metrics after filtering — returning empty scores")
-            return {}
+            return EvaluationResult(scores=[{} for _ in samples], aggregate={})
 
         llm = self._build_llm()
         ragas_metrics = [_METRIC_REGISTRY[name](llm=llm) for name in active_metrics]
@@ -84,13 +84,16 @@ class RagasEvaluator(BaseEvaluator):
         )
 
         result = evaluate(dataset=dataset, metrics=ragas_metrics)
-        scores = result.to_pandas()
+        df = result.to_pandas()
 
-        return {
-            name: float(scores[name].mean())
-            for name in active_metrics
-            if name in scores.columns
-        }
+        active_cols = [name for name in active_metrics if name in df.columns]
+        per_sample = [
+            {name: float(row[name]) for name in active_cols}
+            for _, row in df.iterrows()
+        ]
+        aggregate = {name: float(df[name].mean()) for name in active_cols}
+
+        return EvaluationResult(scores=per_sample, aggregate=aggregate)
 
     def _build_llm(self):
         cfg = self._judge_llm_config
