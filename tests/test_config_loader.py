@@ -482,6 +482,20 @@ def test_evaluation_golden_path_string_is_accepted(monkeypatch):
     assert config.golden_path == "data/golden/questions.yaml"
 
 
+@pytest.mark.parametrize("invalid_level", ["VERBOSE", "TRACE", "info", "debug", ""])
+def test_evaluation_rejects_invalid_log_level(invalid_level, monkeypatch):
+    monkeypatch.setenv("PHOENIX_DB_PATH", "/tmp/test.db")
+    with pytest.raises(ValidationError):
+        EvaluationConfig(**{**VALID_EVALUATION, "log_level": invalid_level})
+
+
+def test_evaluation_rejects_anthropic_judge_provider(monkeypatch):
+    monkeypatch.setenv("PHOENIX_DB_PATH", "/tmp/test.db")
+    invalid_evaluator = {**VALID_EVALUATION["evaluator"], "judge_llm": {"provider": "anthropic", "model": "claude-3"}}
+    with pytest.raises(ValidationError):
+        EvaluationConfig(**{**VALID_EVALUATION, "evaluator": invalid_evaluator})
+
+
 # ---------------------------------------------------------------------------
 # load_eval_config cache behaviour
 # ---------------------------------------------------------------------------

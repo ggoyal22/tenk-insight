@@ -3,6 +3,16 @@
 import os
 
 from config.loader import EvaluationConfig
+
+
+def _get_phoenix_db_path() -> str:
+    path = (os.environ.get("PHOENIX_DB_PATH") or "").strip()
+    if not path:
+        raise ValueError(
+            "PHOENIX_DB_PATH is not set or is empty. "
+            "This should have been caught by EvaluationConfig validation — check your .env file."
+        )
+    return path
 from evaluation.evaluators.base import BaseEvaluator
 from evaluation.evaluators.ragas import RagasEvaluator
 from evaluation.exporters.base import BaseResultExporter
@@ -14,7 +24,7 @@ from evaluation.extractors.phoenix import PhoenixExtractor
 
 def build_extractor(config: EvaluationConfig) -> BaseExtractor:
     if config.extractor.backend == "phoenix":
-        return PhoenixExtractor(os.environ["PHOENIX_DB_PATH"])
+        return PhoenixExtractor(_get_phoenix_db_path())
     raise ValueError(f"Unknown extractor backend: '{config.extractor.backend}'")
 
 
@@ -27,5 +37,5 @@ def build_evaluator(config: EvaluationConfig) -> BaseEvaluator:
 def build_exporters(config: EvaluationConfig) -> list[BaseResultExporter]:
     exporters: list[BaseResultExporter] = [JSONLResultExporter(config.results.results_dir)]
     if config.results.phoenix_annotations:
-        exporters.append(PhoenixTraceAnnotationExporter(os.environ["PHOENIX_DB_PATH"]))
+        exporters.append(PhoenixTraceAnnotationExporter(_get_phoenix_db_path()))
     return exporters

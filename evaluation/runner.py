@@ -36,7 +36,7 @@ class EvaluationRunner:
         self._golden = golden
 
     def run(self, config: EvaluationConfig) -> RunResult:
-        run_id = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
+        run_id = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")
         git_sha = _resolve_git_sha()
 
         samples_by_dataset = self._extractor.extract(config.datasets)

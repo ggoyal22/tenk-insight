@@ -88,7 +88,14 @@ def attach_references(samples: list[EvalSample], golden: dict[str, str]) -> None
         if ref is not None:
             sample.reference = ref
             matched += 1
-    logger.info("Attached references to %d / %d sample(s)", matched, len(samples))
+    if matched == 0 and samples:
+        logger.warning(
+            "Attached references to 0 / %d sample(s) — no golden queries matched; "
+            "check for exact-string mismatches between golden file and trace queries",
+            len(samples),
+        )
+    else:
+        logger.info("Attached references to %d / %d sample(s)", matched, len(samples))
 
 
 # ---------------------------------------------------------------------------

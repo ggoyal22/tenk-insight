@@ -147,6 +147,15 @@ def test_scores_and_aggregate_are_consistent():
     assert result.aggregate["faithfulness"] == pytest.approx(0.7)
 
 
+def test_nan_scores_are_filtered_from_per_sample_and_aggregate():
+    evaluator = RagasEvaluator(_make_config())
+    patches = _patch_ragas({"faithfulness": [float("nan")]})
+    with patches[0], patches[1], patches[2], patches[3], patches[4]:
+        result = evaluator.evaluate([_sample()], metrics=["faithfulness"])
+    assert "faithfulness" not in result.scores[0]
+    assert "faithfulness" not in result.aggregate
+
+
 # ---------------------------------------------------------------------------
 # LLM wiring
 # ---------------------------------------------------------------------------

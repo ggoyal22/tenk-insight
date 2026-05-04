@@ -223,7 +223,7 @@ class TracingConfig(BaseModel):
 # ---------------------------------------------------------------------------
 
 class JudgeLLMConfig(BaseModel):
-    provider: Literal["openai", "anthropic"] = "openai"
+    provider: Literal["openai"] = "openai"
     model: str = "gpt-4o-mini"
     api_key: SecretStr | None = None  # from JUDGE_LLM_API_KEY in .env
 
@@ -258,7 +258,7 @@ class EvaluationConfig(BaseModel):
     # are skipped automatically; set to a YAML file path to enable them
     golden_path: str | None = None
     results: ResultsConfig = Field(default_factory=ResultsConfig)
-    log_level: str = "INFO"
+    log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "INFO"
 
     @model_validator(mode="after")
     def phoenix_db_path_required(self) -> "EvaluationConfig":

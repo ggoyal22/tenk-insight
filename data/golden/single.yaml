@@ -4,7 +4,7 @@
 # and answer_correctness evaluation.
 # query_type is required for schema consistency and future routing validation.
 
-- query: "NVDA datacenter revenuw?"
+- query: "What was NVDA Data Center revenue in fiscal year 2024?"
   query_type: single
   answer: >
     Data Center revenue for fiscal year 2024 was $47.5 billion,

@@ -17,6 +17,7 @@ for that metric on that trace.
 
 import logging
 import sqlite3
+from datetime import datetime, timezone
 
 from evaluation.exporters.base import BaseResultExporter
 from evaluation.types import EvalSample, EvaluationResult, RunResult
@@ -46,6 +47,8 @@ class PhoenixTraceAnnotationExporter(BaseResultExporter):
             return
 
         with sqlite3.connect(self._db_path) as conn:
+            conn.execute("PRAGMA foreign_keys = ON")
+            conn.execute("PRAGMA journal_mode=WAL")
             self._ensure_schema(conn)
             conn.execute(
                 """
@@ -59,7 +62,7 @@ class PhoenixTraceAnnotationExporter(BaseResultExporter):
                     result.extractor,
                     result.evaluator,
                     int(result.golden_used),
-                    result.run_id,
+                    datetime.now(timezone.utc).isoformat(),
                 ),
             )
             conn.executemany(

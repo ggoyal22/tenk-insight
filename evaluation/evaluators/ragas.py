@@ -11,6 +11,8 @@ has a non-None reference, rather than raising an error.
 """
 
 import logging
+import math
+from typing import Any
 
 from openai import OpenAI
 from ragas import EvaluationDataset, SingleTurnSample, evaluate
@@ -86,16 +88,24 @@ class RagasEvaluator(BaseEvaluator):
         result = evaluate(dataset=dataset, metrics=ragas_metrics)
         df = result.to_pandas()
 
+        assert len(df) == len(samples), (
+            f"RAGAS returned {len(df)} rows for {len(samples)} input samples — score alignment broken"
+        )
+
         active_cols = [name for name in active_metrics if name in df.columns]
         per_sample = [
-            {name: float(row[name]) for name in active_cols}
+            {name: float(row[name]) for name in active_cols if not math.isnan(float(row[name]))}
             for _, row in df.iterrows()
         ]
-        aggregate = {name: float(df[name].mean()) for name in active_cols}
+        aggregate = {
+            name: float(df[name].mean())
+            for name in active_cols
+            if not math.isnan(df[name].mean())
+        }
 
         return EvaluationResult(scores=per_sample, aggregate=aggregate)
 
-    def _build_llm(self):
+    def _build_llm(self) -> Any:
         cfg = self._judge_llm_config
         if cfg.provider == "openai":
             api_key = cfg.api_key.get_secret_value() if cfg.api_key else None

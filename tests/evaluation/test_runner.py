@@ -187,9 +187,9 @@ def test_runner_extractor_uses_config_datasets():
 def test_runner_run_id_is_iso8601_timestamp():
     runner = _make_runner({"single": [_sample()]}, _eval_result())
     result = runner.run(_eval_config())
-    # ISO-8601: YYYY-MM-DDTHH:MM:SS
+    # ISO-8601 with microseconds: YYYY-MM-DDTHH:MM:SS.ffffff
     import re
-    assert re.match(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}", result.run_id)
+    assert re.match(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+", result.run_id)
 
 
 # ---------------------------------------------------------------------------
