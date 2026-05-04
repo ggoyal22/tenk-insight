@@ -258,6 +258,7 @@ class EvaluationConfig(BaseModel):
     # are skipped automatically; set to a YAML file path to enable them
     golden_path: str | None = None
     results: ResultsConfig = Field(default_factory=ResultsConfig)
+    log_level: str = "INFO"
 
     @model_validator(mode="after")
     def phoenix_db_path_required(self) -> "EvaluationConfig":

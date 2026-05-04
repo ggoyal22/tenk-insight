@@ -143,3 +143,5 @@ evaluation:
   results:
     phoenix_annotations: true   # write per-trace scores back to Phoenix as span annotations
     results_dir: data/eval_results  # aggregate run history written here as runs.jsonl
+
+  log_level: INFO               # DEBUG / INFO / WARNING / ERROR
