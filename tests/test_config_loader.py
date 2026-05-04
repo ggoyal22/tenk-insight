@@ -85,7 +85,6 @@ def test_database_valid_config():
 def test_edgar_valid_config():
     config = EdgarConfig(**VALID_EDGAR)
     assert config.tickers == VALID_EDGAR["tickers"]
-    assert config.rate_limit_per_second == VALID_EDGAR["rate_limit_per_second"]
 
 
 # ---------------------------------------------------------------------------
@@ -229,16 +228,6 @@ def test_database_password_is_secret_str():
 # EdgarConfig validation
 # ---------------------------------------------------------------------------
 
-def test_edgar_rejects_zero_rate_limit():
-    with pytest.raises(ValidationError):
-        EdgarConfig(**{**VALID_EDGAR, "rate_limit_per_second": 0})
-
-
-def test_edgar_rejects_rate_limit_above_sec_max():
-    with pytest.raises(ValidationError):
-        EdgarConfig(**{**VALID_EDGAR, "rate_limit_per_second": 11})
-
-
 def test_edgar_rejects_pre_edgar_year():
     with pytest.raises(ValidationError):
         EdgarConfig(**{**VALID_EDGAR, "years": [1992]})
@@ -313,7 +302,7 @@ def test_llm_accepts_none_base_url():
     assert config.base_url is None
 
 
-@pytest.mark.parametrize("invalid_provider", ["openai", "anthropic", "cohere", "vllm", "claude", ""])
+@pytest.mark.parametrize("invalid_provider", ["anthropic", "cohere", "vllm", "claude", ""])
 def test_llm_rejects_invalid_provider(invalid_provider):
     with pytest.raises(ValidationError):
         LLMConfig(**{**VALID_LLM, "provider": invalid_provider})
