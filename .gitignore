@@ -9,7 +9,8 @@
 !.env.example
 
 # Raw filing data — large files, reproducible by re-running ingestion
-data/
+# Only data/raw/ is ignored; data/golden/ and data/eval_results/ are versioned artifacts
+data/raw/
 
 # Python
 __pycache__/
