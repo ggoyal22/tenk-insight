@@ -24,3 +24,7 @@ opentelemetry-exporter-otlp-proto-http~=1.0     # OTLP/HTTP exporter; reads OTEL
 openinference-instrumentation-langchain~=0.1    # auto-instruments LangGraph node transitions
 openinference-semantic-conventions~=0.1         # semantic conventions for LLM span attributes
 
+# Evaluation
+ragas~=0.2                  # RAG evaluation metrics (faithfulness, answer_relevancy, context_precision, context_recall)
+langchain-openai~=0.2       # LangChain OpenAI wrapper; required by RAGAS for judge LLM
+
