@@ -32,6 +32,8 @@ def build_graph(
     # a list of Send objects for fan-out to the retrieve node.
 
     def route_after_analyze(state: GenerationState):
+        if config.eval_stop_after == "analyze_query":
+            return END
         if state["query_type"] == "out_of_scope":
             logger.debug("Query is out of scope — terminating early.")
             return END
@@ -47,6 +49,8 @@ def build_graph(
         return [Send("retrieve", {"task": t, "hyde_query": None}) for t in tasks]
 
     def route_after_hyde(state: GenerationState):
+        if config.eval_stop_after == "hyde_expand":
+            return END
         tasks = state["pending_tasks"]
         if not tasks:
             logger.warning(
@@ -57,6 +61,8 @@ def build_graph(
         return [Send("retrieve", {"task": t, "hyde_query": state["hyde_query"]}) for t in tasks]
 
     def route_after_retrieve(state: GenerationState):
+        if config.eval_stop_after == "retrieve":
+            return END
         # Route to check_hop only for multi-hop queries where we haven't exceeded
         # the hop limit and retrieval wasn't triggered by reflection (which already
         # has its own quality loop and doesn't need multi-hop chaining on top).
@@ -69,17 +75,23 @@ def build_graph(
         return "generate"
 
     def route_after_check_hop(state: GenerationState):
+        if config.eval_stop_after == "check_hop":
+            return END
         tasks = state["pending_tasks"]
         if tasks:
             return [Send("retrieve", {"task": t, "hyde_query": state.get("hyde_query")}) for t in tasks]
         return "generate"
 
     def route_after_generate(state: GenerationState):
+        if config.eval_stop_after == "generate":
+            return END
         if config.reflection.enabled:
             return "reflect"
         return END
 
     def route_after_reflect(state: GenerationState):
+        if config.eval_stop_after == "reflect":
+            return END
         tasks = state["pending_tasks"]
         if tasks and state["reflection_count"] < config.reflection.max_iterations:
             return [Send("retrieve", {"task": t, "hyde_query": state.get("hyde_query")}) for t in tasks]
