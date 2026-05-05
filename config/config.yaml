@@ -97,12 +97,14 @@ llm:
 # ── Generation ────────────────────────────────────────────────────────────────
 generation:
   hyde:
-    enabled: true               # generate a hypothetical passage to improve vector retrieval
+    enabled: false               # generate a hypothetical passage to improve vector retrieval
   reflection:
-    enabled: true               # re-evaluate answer quality and trigger extra retrieval if needed
+    enabled: false               # re-evaluate answer quality and trigger extra retrieval if needed
     max_iterations: 2
   multi_hop:
     max_hops: 3                 # max retrieval rounds before forcing an answer
+  eval_stop_after: null          # stop after this node in eval runs; null = run to completion
+                                 # valid values: analyze_query | hyde_expand | retrieve | check_hop | generate | reflect
 
 
 # ── Logging ───────────────────────────────────────────────────────────────────
@@ -113,6 +115,11 @@ logging:
 # ── Tracing ───────────────────────────────────────────────────────────────────
 tracing:
   enabled: true                 # set true to export traces (requires OTEL_EXPORTER_OTLP_ENDPOINT in .env)
+
+
+# ── Prompts ───────────────────────────────────────────────────────────────────
+prompts:
+  tag:                          # Phoenix version tag to pull at startup (e.g. "production"); omit for latest
 
 
 # ── Evaluation ────────────────────────────────────────────────────────────────
@@ -137,8 +144,8 @@ evaluation:
     - multi_hop
     - comparison
 
-  # golden_path: data/golden/questions.yaml  # uncomment to enable reference-required metrics
-  golden_path: null
+  golden_path: data/golden/    # enables context_recall for single-hop traces
+
 
   results:
     phoenix_annotations: true   # write per-trace scores back to Phoenix as span annotations

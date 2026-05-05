@@ -127,7 +127,7 @@ def test_analyze_query_returns_query_type_and_tasks():
     analysis = QueryAnalysis(query_type="single", tasks=[task])
     llm = _make_llm(structured_return=StructuredResponse(parsed=analysis, usage=_make_usage()))
 
-    node = make_analyze_query(llm)
+    node = make_analyze_query(llm, "Analyse the query.")
     result = node(_base_state())
 
     assert result["query_type"] == "single"
@@ -139,7 +139,7 @@ def test_analyze_query_passes_system_prompt():
     analysis = QueryAnalysis(query_type="out_of_scope", tasks=[])
     llm = _make_llm(structured_return=StructuredResponse(parsed=analysis, usage=_make_usage()))
 
-    node = make_analyze_query(llm)
+    node = make_analyze_query(llm, "Analyse the query.")
     node(_base_state())
 
     messages = llm.chat_structured.call_args[0][0]
@@ -151,7 +151,7 @@ def test_analyze_query_includes_filter_in_user_message():
     analysis = QueryAnalysis(query_type="single", tasks=[])
     llm = _make_llm(structured_return=StructuredResponse(parsed=analysis, usage=_make_usage()))
 
-    node = make_analyze_query(llm)
+    node = make_analyze_query(llm, "Analyse the query.")
     node(_base_state(query_filter=MetadataFilter(ticker="NVDA")))
 
     messages = llm.chat_structured.call_args[0][0]
@@ -164,7 +164,7 @@ def test_analyze_query_includes_history_in_user_message():
     llm = _make_llm(structured_return=StructuredResponse(parsed=analysis, usage=_make_usage()))
     history = [Message(role="user", content="Prior question")]
 
-    node = make_analyze_query(llm)
+    node = make_analyze_query(llm, "Analyse the query.")
     node(_base_state(history=history))
 
     messages = llm.chat_structured.call_args[0][0]
@@ -177,14 +177,14 @@ def test_analyze_query_includes_history_in_user_message():
 
 def test_hyde_expand_returns_hyde_query():
     llm = _make_llm(chat_return=LLMResponse(content="Hypothetical passage.", usage=_make_usage()))
-    node = make_hyde_expand(llm)
+    node = make_hyde_expand(llm, "Write a hypothetical passage.")
     result = node(_base_state())
     assert result["hyde_query"] == "Hypothetical passage."
 
 
 def test_hyde_expand_sends_query_as_user_message():
     llm = _make_llm(chat_return=LLMResponse(content="passage", usage=_make_usage()))
-    node = make_hyde_expand(llm)
+    node = make_hyde_expand(llm, "Write a hypothetical passage.")
     node(_base_state(query="What was NVDA revenue?"))
 
     messages = llm.chat.call_args[0][0]
@@ -256,7 +256,7 @@ def test_generate_returns_generation_result():
     llm = _make_llm(chat_return=LLMResponse(content="Revenue was $60.9B.", usage=_make_usage()))
     result = _make_retrieval_result()
 
-    node = make_generate(llm)
+    node = make_generate(llm, "Answer the question.", "Compare the companies.", "Analyse how.")
     output = node(_base_state(completed_results=[[result]]))
 
     assert isinstance(output["answer"], GenerationResult)
@@ -267,7 +267,7 @@ def test_generate_builds_citations_from_results():
     llm = _make_llm(chat_return=LLMResponse(content="Answer.", usage=_make_usage()))
     result = _make_retrieval_result()
 
-    node = make_generate(llm)
+    node = make_generate(llm, "Answer the question.", "Compare the companies.", "Analyse how.")
     output = node(_base_state(completed_results=[[result]]))
 
     assert len(output["answer"].citations) == 1
@@ -278,7 +278,7 @@ def test_generate_deduplicates_citations():
     llm = _make_llm(chat_return=LLMResponse(content="Answer.", usage=_make_usage()))
     result = _make_retrieval_result()
 
-    node = make_generate(llm)
+    node = make_generate(llm, "Answer the question.", "Compare the companies.", "Analyse how.")
     # Same result appearing in two groups (e.g. two retrieval hops returned same chunk)
     output = node(_base_state(completed_results=[[result], [result]]))
 
@@ -308,7 +308,7 @@ def test_generate_orders_high_frequency_chunks_first_in_context():
         parent_chunk=low_freq_parent, filing=filing,
     )
 
-    node = make_generate(llm)
+    node = make_generate(llm, "Answer the question.", "Compare the companies.", "Analyse how.")
     # high_freq_result appears in both hops, low_freq_result in only one
     output = node(_base_state(completed_results=[[high_freq_result, low_freq_result], [high_freq_result]]))
 
@@ -323,7 +323,12 @@ def test_generate_orders_high_frequency_chunks_first_in_context():
     ("time_series", "Analyse how"),
 ])
 def test_generate_selects_correct_prompt(query_type, expected_keyword):
-    prompt = _select_prompt(query_type)
+    prompt = _select_prompt(
+        query_type,
+        qa="Answer the question",
+        comparison="Compare the companies",
+        time_series="Analyse how",
+    )
     assert expected_keyword in prompt
 
 
@@ -336,7 +341,7 @@ def test_check_hop_returns_empty_tasks_when_done():
     llm = _make_llm(structured_return=StructuredResponse(parsed=decision, usage=_make_usage()))
     result = _make_retrieval_result()
 
-    node = make_check_hop(llm, _gen_config())
+    node = make_check_hop(llm, _gen_config(), "Decide if more retrieval is needed.")
     output = node(_base_state(completed_results=[[result]], hop_count=0))
 
     assert output["pending_tasks"] == []
@@ -350,7 +355,7 @@ def test_check_hop_returns_next_task_when_not_done():
     llm = _make_llm(structured_return=StructuredResponse(parsed=decision, usage=_make_usage()))
     result = _make_retrieval_result()
 
-    node = make_check_hop(llm, _gen_config())
+    node = make_check_hop(llm, _gen_config(), "Decide if more retrieval is needed.")
     output = node(_base_state(completed_results=[[result]], hop_count=0))
 
     assert len(output["pending_tasks"]) == 1
@@ -363,7 +368,7 @@ def test_check_hop_returns_empty_tasks_when_not_done_but_next_task_is_none():
     llm = _make_llm(structured_return=StructuredResponse(parsed=decision, usage=_make_usage()))
     result = _make_retrieval_result()
 
-    node = make_check_hop(llm, _gen_config())
+    node = make_check_hop(llm, _gen_config(), "Decide if more retrieval is needed.")
     output = node(_base_state(completed_results=[[result]], hop_count=0))
 
     assert output["pending_tasks"] == []
@@ -379,7 +384,7 @@ def test_reflect_returns_empty_tasks_on_high_quality():
     result = _make_retrieval_result()
     answer = GenerationResult(answer="Revenue was $60.9B.", citations=[], usage=_make_usage())
 
-    node = make_reflect(llm, _gen_config())
+    node = make_reflect(llm, _gen_config(), "Evaluate the answer quality.")
     output = node(_base_state(completed_results=[[result]], answer=answer, reflection_count=0))
 
     assert output["pending_tasks"] == []
@@ -394,7 +399,7 @@ def test_reflect_returns_next_task_on_low_quality():
     result = _make_retrieval_result()
     answer = GenerationResult(answer="Incomplete answer.", citations=[], usage=_make_usage())
 
-    node = make_reflect(llm, _gen_config())
+    node = make_reflect(llm, _gen_config(), "Evaluate the answer quality.")
     output = node(_base_state(completed_results=[[result]], answer=answer, reflection_count=0))
 
     assert len(output["pending_tasks"]) == 1
@@ -407,7 +412,7 @@ def test_reflect_returns_empty_tasks_when_low_quality_but_no_next_task():
     result = _make_retrieval_result()
     answer = GenerationResult(answer="Bad answer.", citations=[], usage=_make_usage())
 
-    node = make_reflect(llm, _gen_config())
+    node = make_reflect(llm, _gen_config(), "Evaluate the answer quality.")
     output = node(_base_state(completed_results=[[result]], answer=answer, reflection_count=0))
 
     assert output["pending_tasks"] == []

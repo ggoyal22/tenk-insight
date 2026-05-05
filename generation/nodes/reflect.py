@@ -7,18 +7,17 @@ from config.loader import GenerationConfig
 from llm.base import BaseLLM
 from llm.types import Message
 from generation.nodes._context import build_context
-from generation.prompts import REFLECTION_PROMPT
 from generation.types import GenerationState, ReflectionDecision
 
 logger = logging.getLogger(__name__)
 
 
-def make_reflect(llm: BaseLLM, config: GenerationConfig) -> Callable[[GenerationState], dict]:
+def make_reflect(llm: BaseLLM, config: GenerationConfig, prompt: str) -> Callable[[GenerationState], dict]:
     def reflect(state: GenerationState) -> dict:
         answer = state["answer"]
         context = build_context([r for group in state["completed_results"] for r in group])
         messages = [
-            Message(role="system", content=REFLECTION_PROMPT),
+            Message(role="system", content=prompt),
             Message(
                 role="user",
                 content=(

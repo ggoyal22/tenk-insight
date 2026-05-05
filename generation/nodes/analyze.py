@@ -3,16 +3,15 @@ from collections.abc import Callable
 
 from llm.base import BaseLLM
 from llm.types import Message
-from generation.prompts import QUERY_ANALYSIS_PROMPT
 from generation.types import GenerationState, QueryAnalysis
 
 logger = logging.getLogger(__name__)
 
 
-def make_analyze_query(llm: BaseLLM) -> Callable[[GenerationState], dict]:
+def make_analyze_query(llm: BaseLLM, prompt: str) -> Callable[[GenerationState], dict]:
     def analyze_query(state: GenerationState) -> dict:
         messages = [
-            Message(role="system", content=QUERY_ANALYSIS_PROMPT),
+            Message(role="system", content=prompt),
             Message(role="user", content=_build_user_message(state)),
         ]
         response = llm.chat_structured(messages, QueryAnalysis)

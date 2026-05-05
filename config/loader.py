@@ -199,6 +199,7 @@ class GenerationConfig(BaseModel):
     hyde: HydeConfig = Field(default_factory=HydeConfig)
     reflection: ReflectionConfig = Field(default_factory=ReflectionConfig)
     multi_hop: MultiHopConfig = Field(default_factory=MultiHopConfig)
+    eval_stop_after: Literal["analyze_query", "hyde_expand", "retrieve", "check_hop", "generate", "reflect"] | None = None
 
 
 class LoggingConfig(BaseModel):
@@ -216,6 +217,10 @@ class TracingConfig(BaseModel):
                 "See .env.example for the expected format."
             )
         return self
+
+
+class PromptsConfig(BaseModel):
+    tag: str | None = None  # Phoenix version tag to pull at startup; None → latest
 
 
 # ---------------------------------------------------------------------------
@@ -305,6 +310,7 @@ class AppConfig(BaseModel):
     generation: GenerationConfig
     logging: LoggingConfig
     tracing: TracingConfig = Field(default_factory=TracingConfig)
+    prompts: PromptsConfig = Field(default_factory=PromptsConfig)
 
 
 # ---------------------------------------------------------------------------
@@ -431,6 +437,7 @@ def _load() -> AppConfig:
         generation=GenerationConfig(**yaml_data["generation"]),
         logging=LoggingConfig(**yaml_data["logging"]),
         tracing=TracingConfig(**yaml_data.get("tracing", {})),
+        prompts=PromptsConfig(**yaml_data.get("prompts", {})),
     )
 
 

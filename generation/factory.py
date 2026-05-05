@@ -10,6 +10,7 @@ from generation.nodes import (
     make_reflect,
     make_retrieve,
 )
+from generation.prompt_registry import load_prompts
 from llm.factory import build_llm
 from retrieval.factory import build_retriever_from_config
 
@@ -31,14 +32,15 @@ def build_generation_pipeline(config: AppConfig, db_client: DatabaseClient, embe
     """
     llm = build_llm(config.llm)
     retriever = build_retriever_from_config(config, db_client)
+    prompts = load_prompts(tag=config.prompts.tag)
 
     return build_graph(
-        analyze_query_fn=make_analyze_query(llm),
-        hyde_expand_fn=make_hyde_expand(llm),
+        analyze_query_fn=make_analyze_query(llm, prompts.query_analysis),
+        hyde_expand_fn=make_hyde_expand(llm, prompts.hyde),
         retrieve_fn=make_retrieve(retriever, embedder),
-        generate_fn=make_generate(llm),
-        check_hop_fn=make_check_hop(llm, config.generation),
-        reflect_fn=make_reflect(llm, config.generation),
+        generate_fn=make_generate(llm, prompts.qa, prompts.comparison, prompts.time_series),
+        check_hop_fn=make_check_hop(llm, config.generation, prompts.check_hop),
+        reflect_fn=make_reflect(llm, config.generation, prompts.reflection),
         config=config.generation,
     )
 

@@ -74,12 +74,12 @@ def _make_retriever(results=None) -> MagicMock:
 
 def _build_graph(llm, retriever, embedder, config: GenerationConfig):
     return build_graph(
-        analyze_query_fn=make_analyze_query(llm),
-        hyde_expand_fn=make_hyde_expand(llm),
+        analyze_query_fn=make_analyze_query(llm, "Analyse the query."),
+        hyde_expand_fn=make_hyde_expand(llm, "Write a hypothetical passage."),
         retrieve_fn=make_retrieve(retriever, embedder),
-        generate_fn=make_generate(llm),
-        check_hop_fn=make_check_hop(llm, config),
-        reflect_fn=make_reflect(llm, config),
+        generate_fn=make_generate(llm, "Answer the question.", "Compare the companies.", "Analyse how."),
+        check_hop_fn=make_check_hop(llm, config, "Decide if more retrieval is needed."),
+        reflect_fn=make_reflect(llm, config, "Evaluate the answer quality."),
         config=config,
     )
 

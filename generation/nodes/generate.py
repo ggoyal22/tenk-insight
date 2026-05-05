@@ -5,16 +5,20 @@ from uuid import UUID
 from llm.base import BaseLLM
 from llm.types import Message
 from generation.nodes._context import build_context
-from generation.prompts import COMPARISON_PROMPT, QA_PROMPT, TIME_SERIES_PROMPT
 from generation.types import Citation, GenerationResult, GenerationState
 from retrieval.types import RetrievalResult
 
 logger = logging.getLogger(__name__)
 
 
-def make_generate(llm: BaseLLM) -> Callable[[GenerationState], dict]:
+def make_generate(
+    llm: BaseLLM,
+    qa_prompt: str,
+    comparison_prompt: str,
+    time_series_prompt: str,
+) -> Callable[[GenerationState], dict]:
     def generate(state: GenerationState) -> dict:
-        prompt = _select_prompt(state["query_type"])
+        prompt = _select_prompt(state["query_type"], qa_prompt, comparison_prompt, time_series_prompt)
         results = _deduplicate(state["completed_results"])
         context = build_context(results)
 
@@ -43,12 +47,12 @@ def make_generate(llm: BaseLLM) -> Callable[[GenerationState], dict]:
     return generate
 
 
-def _select_prompt(query_type: str) -> str:
+def _select_prompt(query_type: str, qa: str, comparison: str, time_series: str) -> str:
     if query_type == "comparison":
-        return COMPARISON_PROMPT
+        return comparison
     if query_type == "time_series":
-        return TIME_SERIES_PROMPT
-    return QA_PROMPT  # single, multi_hop
+        return time_series
+    return qa  # single, multi_hop
 
 
 def _deduplicate(completed_results: list[list[RetrievalResult]]) -> list[RetrievalResult]:
