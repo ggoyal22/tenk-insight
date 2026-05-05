@@ -33,10 +33,18 @@ def make_reflect(llm: BaseLLM, config: GenerationConfig, prompt: str) -> Callabl
             if decision.quality == "low" and decision.next_task
             else []
         )
-        logger.debug(
-            "Reflection decision: quality=%r, reflection_count=%d.",
-            decision.quality, state["reflection_count"] + 1,
-        )
+        if decision.quality == "low":
+            logger.warning(
+                "Reflection quality=low reason=%r next_task=%r reflection_count=%d.",
+                decision.reason,
+                decision.next_task.query if decision.next_task else None,
+                state["reflection_count"] + 1,
+            )
+        else:
+            logger.info(
+                "Reflection quality=high reflection_count=%d.",
+                state["reflection_count"] + 1,
+            )
 
         return {
             "pending_tasks": pending_tasks,
