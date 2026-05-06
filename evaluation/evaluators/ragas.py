@@ -14,8 +14,8 @@ import logging
 import math
 from typing import Any
 
-from openai import OpenAI
-from ragas import EvaluationDataset, SingleTurnSample, evaluate
+from openai import AsyncOpenAI
+from ragas.embeddings.base import embedding_factory
 from ragas.llms import llm_factory
 from ragas.metrics.collections import (
     AnswerRelevancy,
@@ -35,6 +35,14 @@ _METRIC_REGISTRY: dict[str, type] = {
     "answer_relevancy": AnswerRelevancy,
     "context_precision": ContextPrecisionWithoutReference,
     "context_recall": ContextRecall,
+}
+
+# Keys each metric's ascore() expects — used to build batch_score inputs.
+_METRIC_KWARGS: dict[str, list[str]] = {
+    "faithfulness": ["user_input", "response", "retrieved_contexts"],
+    "answer_relevancy": ["user_input", "response"],
+    "context_precision": ["user_input", "response", "retrieved_contexts"],
+    "context_recall": ["user_input", "retrieved_contexts", "reference"],
 }
 
 _REFERENCE_REQUIRED: frozenset[str] = frozenset({"context_recall"})
@@ -71,36 +79,30 @@ class RagasEvaluator(BaseEvaluator):
             return EvaluationResult(scores=[{} for _ in samples], aggregate={})
 
         llm = self._build_llm()
-        ragas_metrics = [_METRIC_REGISTRY[name](llm=llm) for name in active_metrics]
+        embeddings = self._build_embeddings()
 
-        dataset = EvaluationDataset(
-            samples=[
-                SingleTurnSample(
-                    user_input=s.user_input,
-                    retrieved_contexts=s.retrieved_contexts,
-                    response=s.response,
-                    reference=s.reference,
-                )
-                for s in samples
-            ]
-        )
+        per_sample: list[dict[str, float]] = [{} for _ in samples]
 
-        result = evaluate(dataset=dataset, metrics=ragas_metrics)
-        df = result.to_pandas()
+        for name in active_metrics:
+            metric = (
+                _METRIC_REGISTRY[name](llm=llm, embeddings=embeddings)
+                if name == "answer_relevancy"
+                else _METRIC_REGISTRY[name](llm=llm)
+            )
+            inputs = [_sample_to_kwargs(s, _METRIC_KWARGS[name]) for s in samples]
+            results = metric.batch_score(inputs)
+            for i, res in enumerate(results):
+                try:
+                    v = float(res.value)
+                    if not math.isnan(v):
+                        per_sample[i][name] = v
+                except (TypeError, ValueError):
+                    pass
 
-        assert len(df) == len(samples), (
-            f"RAGAS returned {len(df)} rows for {len(samples)} input samples — score alignment broken"
-        )
-
-        active_cols = [name for name in active_metrics if name in df.columns]
-        per_sample = [
-            {name: float(row[name]) for name in active_cols if not math.isnan(float(row[name]))}
-            for _, row in df.iterrows()
-        ]
         aggregate = {
-            name: float(df[name].mean())
-            for name in active_cols
-            if not math.isnan(df[name].mean())
+            name: _mean([s[name] for s in per_sample if name in s])
+            for name in active_metrics
+            if any(name in s for s in per_sample)
         }
 
         return EvaluationResult(scores=per_sample, aggregate=aggregate)
@@ -109,6 +111,26 @@ class RagasEvaluator(BaseEvaluator):
         cfg = self._judge_llm_config
         if cfg.provider == "openai":
             api_key = cfg.api_key.get_secret_value() if cfg.api_key else None
-            client = OpenAI(api_key=api_key)
-            return llm_factory(cfg.model, provider="openai", client=client)
+            self._openai_client = AsyncOpenAI(api_key=api_key)
+            return llm_factory(cfg.model, provider="openai", client=self._openai_client)
         raise ValueError(f"Unsupported judge LLM provider: '{cfg.provider}'")
+
+    def _build_embeddings(self) -> Any:
+        cfg = self._judge_llm_config
+        if cfg.provider == "openai":
+            return embedding_factory(provider="openai", client=self._openai_client)
+        raise ValueError(f"Unsupported judge LLM provider: '{cfg.provider}'")
+
+
+def _sample_to_kwargs(sample: EvalSample, keys: list[str]) -> dict:
+    all_fields = {
+        "user_input": sample.user_input,
+        "response": sample.response,
+        "retrieved_contexts": sample.retrieved_contexts,
+        "reference": sample.reference,
+    }
+    return {k: all_fields[k] for k in keys}
+
+
+def _mean(values: list[float]) -> float:
+    return sum(values) / len(values) if values else float("nan")
