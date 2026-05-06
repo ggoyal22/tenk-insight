@@ -38,3 +38,19 @@ def setup_tracing(config: TracingConfig) -> None:
             "Check that OTEL_EXPORTER_OTLP_ENDPOINT is reachable and that "
             "openinference-instrumentation-langchain is installed."
         ) from exc
+
+
+def flush_spans(timeout_millis: int = 30_000) -> None:
+    """Force-flush buffered spans from the BatchSpanProcessor.
+
+    Call before reading the Phoenix DB to ensure all traces have been written.
+    No-op if tracing was not initialised.
+    """
+    provider = trace.get_tracer_provider()
+    if hasattr(provider, "force_flush"):
+        flushed = provider.force_flush(timeout_millis=timeout_millis)
+        if not flushed:
+            logger.warning(
+                "OTel span flush timed out after %dms — some traces may be missing from evaluation",
+                timeout_millis,
+            )

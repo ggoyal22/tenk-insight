@@ -24,7 +24,6 @@ from evaluation.types import EvalSample, EvaluationResult, RunResult
 
 logger = logging.getLogger(__name__)
 
-_ANNOTATION_SOURCE = "ragas_evaluation"
 
 
 class PhoenixTraceAnnotationExporter(BaseResultExporter):
@@ -68,8 +67,8 @@ class PhoenixTraceAnnotationExporter(BaseResultExporter):
             conn.executemany(
                 """
                 INSERT OR REPLACE INTO span_annotations
-                    (span_id, run_id, name, score, source)
-                VALUES (?, ?, ?, ?, ?)
+                    (span_rowid, name, score, annotator_kind, source, metadata, identifier)
+                VALUES (?, ?, ?, 'CODE', 'APP', '{}', ?)
                 """,
                 annotation_rows,
             )
@@ -93,7 +92,7 @@ class PhoenixTraceAnnotationExporter(BaseResultExporter):
         rows = []
         for sample, sample_scores in zip(samples, evaluation.scores):
             for metric_name, score in sample_scores.items():
-                rows.append((sample.trace_id, run_id, metric_name, score, _ANNOTATION_SOURCE))
+                rows.append((sample.trace_id, metric_name, score, run_id))
         return rows
 
     @staticmethod
@@ -106,15 +105,5 @@ class PhoenixTraceAnnotationExporter(BaseResultExporter):
                 evaluator   TEXT NOT NULL,
                 golden_used INTEGER NOT NULL,
                 created_at  TEXT NOT NULL
-            )
-        """)
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS span_annotations (
-                span_id TEXT NOT NULL,
-                run_id  TEXT NOT NULL REFERENCES evaluation_runs(run_id),
-                name    TEXT NOT NULL,
-                score   REAL NOT NULL,
-                source  TEXT NOT NULL,
-                PRIMARY KEY (span_id, run_id, name)
             )
         """)

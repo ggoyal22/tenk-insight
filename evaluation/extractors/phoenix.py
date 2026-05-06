@@ -2,6 +2,7 @@ import json
 import logging
 import sqlite3
 from collections import defaultdict
+from datetime import datetime, timezone
 
 from evaluation.extractors.base import BaseExtractor
 from evaluation.types import EvalSample
@@ -13,11 +14,13 @@ class PhoenixExtractor(BaseExtractor):
     def __init__(self, db_path: str) -> None:
         self._db_path = db_path
 
-    def extract(self, datasets: list[str]) -> dict[str, list[EvalSample]]:
+    def extract(
+        self, datasets: list[str], since: datetime | None = None
+    ) -> dict[str, list[EvalSample]]:
         result: dict[str, list[EvalSample]] = {ds: [] for ds in datasets}
 
         with sqlite3.connect(self._db_path) as conn:
-            trace_ids = self._complete_trace_ids(conn)
+            trace_ids = self._complete_trace_ids(conn, since=since)
             if not trace_ids:
                 logger.warning("No complete traces found in Phoenix DB at %s", self._db_path)
                 return result
@@ -42,26 +45,35 @@ class PhoenixExtractor(BaseExtractor):
     # Internal helpers
     # ------------------------------------------------------------------
 
-    def _complete_trace_ids(self, conn: sqlite3.Connection) -> list[int]:
+    def _complete_trace_ids(
+        self, conn: sqlite3.Connection, since: datetime | None = None
+    ) -> list[int]:
         """Return trace_rowids for traces that reached the generate node.
 
         Out-of-scope queries terminate before generate and are excluded —
         RAGAS metrics require both a response and retrieved contexts.
+        since: when set, restricts to traces whose start_time >= since (UTC).
         """
-        cur = conn.execute("SELECT DISTINCT trace_rowid FROM spans WHERE name = 'generate'")
-        return [row[0] for row in cur.fetchall()]
+        sql = "SELECT DISTINCT trace_rowid FROM spans WHERE name = 'generate'"
+        params: tuple = ()
+        if since is not None:
+            sql += " AND datetime(start_time) >= datetime(?)"
+            params = (since.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),)
+        return [row[0] for row in conn.execute(sql, params).fetchall()]
 
     def _extract_sample(self, conn: sqlite3.Connection, trace_rowid: int) -> EvalSample | None:
         cur = conn.execute(
-            "SELECT name, attributes FROM spans WHERE trace_rowid = ? ORDER BY start_time",
+            "SELECT id, name, attributes FROM spans WHERE trace_rowid = ? ORDER BY start_time",
             (trace_rowid,),
         )
-        # Collect all spans grouped by name; preserves insertion order (start_time ASC)
-        # so generate[-1] is always the final generation node.
+        # Collect spans grouped by name; span_rowids tracks spans.id for annotation writes.
+        # Insertion order (start_time ASC) is preserved so generate[-1] is the final node.
         spans: dict[str, list[dict]] = defaultdict(list)
-        for name, attrs_json in cur.fetchall():
+        span_rowids: dict[str, list[int]] = defaultdict(list)
+        for span_id, name, attrs_json in cur.fetchall():
             try:
                 spans[name].append(json.loads(attrs_json))
+                span_rowids[name].append(span_id)
             except (json.JSONDecodeError, TypeError):
                 logger.warning("Skipping malformed span '%s' in trace %s", name, trace_rowid)
                 continue
@@ -72,8 +84,11 @@ class PhoenixExtractor(BaseExtractor):
 
         try:
             root_input = json.loads(spans["LangGraph"][0]["input"]["value"])
-            query_type: str = root_input.get("query_type", "")
             user_input: str = root_input["query"]
+
+            # query_type is set by analyze_query mid-run; read from output, not input
+            root_output = json.loads(spans["LangGraph"][0]["output"]["value"])
+            query_type: str = root_output.get("query_type", "")
 
             response_output = json.loads(spans["generate"][-1]["output"]["value"])
             response: str = response_output["answer"]["answer"]
@@ -83,11 +98,8 @@ class PhoenixExtractor(BaseExtractor):
             logger.warning("Skipping trace %s — failed to parse spans: %s", trace_rowid, exc)
             return None
 
-        # Derive trace_id from the span's own span_id on the root span for a stable identifier
-        root_span_id = spans["LangGraph"][0].get("span_id", str(trace_rowid))
-
         return EvalSample(
-            trace_id=root_span_id,
+            trace_id=span_rowids["LangGraph"][0],
             query_type=query_type,
             user_input=user_input,
             retrieved_contexts=contexts,

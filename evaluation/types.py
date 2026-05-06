@@ -17,7 +17,7 @@ class EvaluationResult:
 
 @dataclass
 class EvalSample:
-    trace_id:            str
+    trace_id:            int
     query_type:          str
     user_input:          str
     retrieved_contexts:  list[str]

@@ -35,11 +35,11 @@ class EvaluationRunner:
         self._exporters = exporters
         self._golden = golden
 
-    def run(self, config: EvaluationConfig) -> RunResult:
+    def run(self, config: EvaluationConfig, since: datetime | None = None) -> RunResult:
         run_id = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")
         git_sha = _resolve_git_sha()
 
-        samples_by_dataset = self._extractor.extract(config.datasets)
+        samples_by_dataset = self._extractor.extract(config.datasets, since=since)
 
         all_samples: list[EvalSample] = []
         all_scores: list[dict[str, float]] = []
