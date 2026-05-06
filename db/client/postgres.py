@@ -41,7 +41,13 @@ class PostgresClient(DatabaseClient):
         )
 
     def get_connection(self) -> DatabaseConnection:
-        return self._pool.getconn()
+        conn = self._pool.getconn()
+        try:
+            conn.cursor().execute("SELECT 1")
+        except Exception:
+            self._pool.putconn(conn, close=True)
+            conn = self._pool.getconn()
+        return conn
 
     def release_connection(self, conn: DatabaseConnection) -> None:
         # psycopg2 expects its own connection type; cast is safe — we only ever
