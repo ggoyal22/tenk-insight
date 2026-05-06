@@ -1,0 +1,36 @@
+# Golden Q&A pairs for multi-hop queries against NVDA 10-K FY2024.
+# Each question requires combining information from two or more document sections.
+
+- query: "How much did NVDA return to shareholders in total during fiscal year 2024?"
+  query_type: multi_hop
+  answer: >
+    NVDA returned approximately $10.1 billion to shareholders in fiscal year 2024,
+    comprising $9.7 billion in share repurchases (21 million shares) and $395 million
+    in quarterly cash dividends.
+
+- query: "What drove the improvement in NVDA's total operating expense ratio despite dollar growth in fiscal year 2024?"
+  query_type: multi_hop
+  answer: >
+    Total operating expenses grew only $197 million (2%) to $11,329 million in
+    fiscal year 2024, while revenue grew $33,948 million (126%) to $60,922 million.
+    Because expense growth was far outpaced by revenue growth, the operating expense
+    ratio fell sharply from 41.3% to 18.6% of net revenue, primarily reflecting
+    operating leverage on the Data Center revenue surge.
+
+- query: "Which NVDA market platform had the weakest revenue performance in fiscal year 2024 and why?"
+  query_type: multi_hop
+  answer: >
+    OEM and Other had the weakest performance, declining from $455 million in
+    fiscal year 2023 to $306 million in fiscal year 2024. Among growing platforms,
+    Professional Visualization was nearly flat at $1,553 million versus $1,544 million
+    the prior year. The Data Center platform drove the majority of total revenue
+    growth, while Gaming, Automotive, and Professional Visualization each grew modestly.
+
+- query: "What was the relationship between NVDA's Data Center revenue growth and its operating leverage in fiscal year 2024?"
+  query_type: multi_hop
+  answer: >
+    Data Center revenue grew 217% to $47,525 million and was the primary driver of
+    total revenue growing 126% to $60,922 million. Because operating expenses grew
+    only 2% to $11,329 million over the same period, operating income surged 681%
+    to $32,972 million and operating margin expanded from 15.6% to 54.1%, demonstrating
+    significant operating leverage on the Data Center-driven revenue growth.

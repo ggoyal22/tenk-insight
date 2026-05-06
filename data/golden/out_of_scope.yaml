@@ -1,0 +1,24 @@
+# Golden Q&A pairs for out-of-scope queries against NVDA 10-K FY2024.
+# These questions cannot be answered from the filing — the correct response
+# is to acknowledge the information is not present rather than hallucinate.
+
+- query: "What was AMD's data center revenue in their most recent fiscal year?"
+  query_type: out_of_scope
+  answer: >
+    The NVDA fiscal year 2024 10-K does not contain financial data for AMD or
+    any other competitor. This information cannot be answered from the filing.
+
+- query: "What revenue guidance did NVDA provide for the first quarter of fiscal year 2025?"
+  query_type: out_of_scope
+  answer: >
+    The NVDA fiscal year 2024 10-K does not include specific quarterly revenue
+    guidance figures for fiscal year 2025. The filing notes that next-generation
+    products are expected to be supply-constrained based on demand indications,
+    but provides no numerical outlook for Q1 fiscal year 2025.
+
+- query: "What is NVDA's current stock price?"
+  query_type: out_of_scope
+  answer: >
+    The NVDA fiscal year 2024 10-K does not contain real-time or current stock
+    price information. The filing covers the fiscal year ended January 28, 2024
+    and does not include post-filing market data.
