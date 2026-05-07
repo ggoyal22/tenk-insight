@@ -16,7 +16,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import streamlit as st
 
 from config.loader import load_config
-from db.factory import create_db_client
+from db.factory import create_db_client, create_filings_repo
 from etl.factory import create_embedder
 from generation.factory import build_generation_pipeline, make_initial_state
 from generation.types import Citation, GenerationResult
@@ -58,7 +58,8 @@ def load_pipeline():
         raise RuntimeError("Database health check failed — is PostgreSQL running?")
     embedder = create_embedder(config)
     graph = build_generation_pipeline(config, client, embedder)
-    return config, client, graph
+    indexed = create_filings_repo(client).list_indexed_summary()
+    return config, client, graph, indexed
 
 
 def render_citations(citations: list[dict]) -> None:
@@ -132,7 +133,7 @@ def main() -> None:
     )
 
     try:
-        config, _db_client, graph = load_pipeline()
+        config, _db_client, graph, indexed = load_pipeline()
     except Exception:
         logger.exception("Failed to initialize pipeline")
         st.error("Failed to initialize the pipeline. Check server logs for details.")
@@ -147,11 +148,10 @@ def main() -> None:
 
     with st.sidebar:
         st.title("Financial 10-K Q&A")
-        st.markdown("**Indexed tickers**")
-        for ticker in config.edgar.tickers:
-            st.markdown(f"- `{ticker}`")
-        st.markdown(f"**Forms:** {', '.join(config.edgar.form_types)}")
-        st.markdown(f"**Years:** {', '.join(str(y) for y in config.edgar.years)}")
+        st.markdown("**Indexed filings**")
+        for ticker, company_name, years in indexed:
+            years_str = ", ".join(str(y) for y in years)
+            st.markdown(f"- `{ticker}` — {company_name} ({years_str})")
         st.divider()
         if st.button("New chat", use_container_width=True):
             st.session_state.messages = []

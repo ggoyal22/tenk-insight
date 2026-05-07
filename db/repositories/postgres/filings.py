@@ -42,6 +42,22 @@ class PostgresFilingsRepository(FilingsRepo, PostgresRepository[FilingRecord]):
         rows = self._execute_returning(sql, (ticker.upper(),))
         return [self._row_to_model(row, self._columns) for row in rows]
 
+    def list_indexed_summary(self) -> list[tuple[str, str, list[int]]]:
+        sql = """
+            SELECT
+                ticker,
+                company_name,
+                array_agg(
+                    DISTINCT EXTRACT(YEAR FROM fiscal_year_end)::int
+                    ORDER BY EXTRACT(YEAR FROM fiscal_year_end)::int DESC
+                )
+            FROM filings
+            GROUP BY ticker, company_name
+            ORDER BY ticker
+        """
+        rows = self._execute_returning(sql, ())
+        return [(row[0], row[1], list(row[2])) for row in rows]
+
     def exists_by_accession_number(self, accession_number: str) -> bool:
         sql = f"SELECT EXISTS(SELECT 1 FROM {self._table} WHERE accession_number = %s)"
         rows = self._execute_returning(sql, (accession_number,))
