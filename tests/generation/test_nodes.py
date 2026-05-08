@@ -10,12 +10,12 @@ import pytest
 from config.loader import GenerationConfig
 from generation.nodes.analyze import make_analyze_query
 from generation.nodes.check_hop import make_check_hop
-from generation.nodes.generate import make_generate, _select_prompt
+from generation.nodes.generate import make_generate, _select_prompt, _filter_by_indices
 from generation.nodes.hyde import make_hyde_expand
 from generation.nodes.reflect import make_reflect
 from generation.nodes.retrieve import make_retrieve, RetrieveInput
 from generation.types import (
-    Citation, GenerationResult, GenerationState,
+    Citation, GenerationResponse, GenerationResult, GenerationState,
     HopDecision, QueryAnalysis, ReflectionDecision, RetrievalTask,
 )
 from llm.base import LLMError
@@ -252,8 +252,12 @@ def test_retrieve_passes_filter_to_retriever():
 # generate
 # ---------------------------------------------------------------------------
 
+def _make_gen_response(answer: str, cited_indices: list[int]) -> StructuredResponse:
+    return StructuredResponse(parsed=GenerationResponse(answer=answer, cited_indices=cited_indices), usage=_make_usage())
+
+
 def test_generate_returns_generation_result():
-    llm = _make_llm(chat_return=LLMResponse(content="Revenue was $60.9B.", usage=_make_usage()))
+    llm = _make_llm(structured_return=_make_gen_response("Revenue was $60.9B.", [1]))
     result = _make_retrieval_result()
 
     node = make_generate(llm, "Answer the question.", "Compare the companies.", "Analyse how.")
@@ -264,7 +268,7 @@ def test_generate_returns_generation_result():
 
 
 def test_generate_builds_citations_from_results():
-    llm = _make_llm(chat_return=LLMResponse(content="Answer.", usage=_make_usage()))
+    llm = _make_llm(structured_return=_make_gen_response("Answer.", [1]))
     result = _make_retrieval_result()
 
     node = make_generate(llm, "Answer the question.", "Compare the companies.", "Analyse how.")
@@ -275,7 +279,7 @@ def test_generate_builds_citations_from_results():
 
 
 def test_generate_deduplicates_citations():
-    llm = _make_llm(chat_return=LLMResponse(content="Answer.", usage=_make_usage()))
+    llm = _make_llm(structured_return=_make_gen_response("Answer.", [1]))
     result = _make_retrieval_result()
 
     node = make_generate(llm, "Answer the question.", "Compare the companies.", "Analyse how.")
@@ -286,7 +290,7 @@ def test_generate_deduplicates_citations():
 
 
 def test_generate_orders_high_frequency_chunks_first_in_context():
-    llm = _make_llm(chat_return=LLMResponse(content="Answer.", usage=_make_usage()))
+    llm = _make_llm(structured_return=_make_gen_response("Answer.", []))
     filing = _make_filing()
 
     high_freq_parent = ParentChunkRecord(
@@ -312,8 +316,40 @@ def test_generate_orders_high_frequency_chunks_first_in_context():
     # high_freq_result appears in both hops, low_freq_result in only one
     output = node(_base_state(completed_results=[[high_freq_result, low_freq_result], [high_freq_result]]))
 
-    context = llm.chat.call_args[0][0][-1].content
+    context = llm.chat_structured.call_args[0][0][-1].content
     assert context.index("HIGH FREQUENCY CHUNK") < context.index("LOW FREQUENCY CHUNK")
+
+
+def test_generate_filters_citations_to_cited_indices():
+    filing = _make_filing()
+    parent1 = _make_parent_chunk(filing.id)
+    parent2 = ParentChunkRecord(
+        id=uuid.uuid4(), filing_id=filing.id, chunk_index=1, section="Risk Factors",
+        text="Competition is intense.", token_count=3, content_hash="c" * 64,
+        created_at=datetime(2024, 3, 1),
+    )
+    result1 = RetrievalResult(score=0.9, chunk=_make_chunk(filing.id, parent1.id), parent_chunk=parent1, filing=filing)
+    result2 = RetrievalResult(score=0.8, chunk=_make_chunk(filing.id, parent2.id), parent_chunk=parent2, filing=filing)
+
+    # LLM only cites index 1, not 2
+    llm = _make_llm(structured_return=_make_gen_response("Revenue was $60.9B [1].", [1]))
+    node = make_generate(llm, "Answer the question.", "Compare the companies.", "Analyse how.")
+    output = node(_base_state(completed_results=[[result1, result2]]))
+
+    assert len(output["answer"].citations) == 1
+    assert output["answer"].citations[0].section == parent1.section
+
+
+def test_generate_falls_back_to_all_citations_when_none_cited():
+    result1 = _make_retrieval_result()
+    result2 = _make_retrieval_result()
+
+    # LLM returns empty cited_indices
+    llm = _make_llm(structured_return=_make_gen_response("I cannot determine this.", []))
+    node = make_generate(llm, "Answer the question.", "Compare the companies.", "Analyse how.")
+    output = node(_base_state(completed_results=[[result1, result2]]))
+
+    assert len(output["answer"].citations) == 2
 
 
 @pytest.mark.parametrize("query_type,expected_keyword", [

@@ -38,6 +38,12 @@ class ReflectionDecision(BaseModel):
     next_task: RetrievalTask | None = None
 
 
+class GenerationResponse(BaseModel):
+    """Structured output of the generate node."""
+    answer: str
+    cited_indices: list[int]
+
+
 # ── Dataclasses — assembled by node code, never produced by the LLM ──────────
 
 @dataclass

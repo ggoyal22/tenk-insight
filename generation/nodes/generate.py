@@ -5,7 +5,7 @@ from uuid import UUID
 from llm.base import BaseLLM
 from llm.types import Message
 from generation.nodes._context import build_context
-from generation.types import Citation, GenerationResult, GenerationState
+from generation.types import Citation, GenerationResponse, GenerationResult, GenerationState
 from retrieval.types import RetrievalResult
 
 logger = logging.getLogger(__name__)
@@ -30,16 +30,17 @@ def make_generate(
             content=f"Question: {state['query']}\n\nContext:\n{context}",
         ))
 
-        response = llm.chat(messages)
-        citations = _build_citations(results)
+        response = llm.chat_structured(messages, GenerationResponse)
+        cited_results = _filter_by_indices(results, response.parsed.cited_indices)
+        citations = _build_citations(cited_results)
 
         logger.debug(
             "Answer generated (%d chars, %d citation(s)).",
-            len(response.content), len(citations),
+            len(response.parsed.answer), len(citations),
         )
 
         return {"answer": GenerationResult(
-            answer=response.content,
+            answer=response.parsed.answer,
             citations=citations,
             usage=response.usage,
         )}
@@ -70,6 +71,11 @@ def _deduplicate(completed_results: list[list[RetrievalResult]]) -> list[Retriev
             if pid not in unique:
                 unique[pid] = r
     return sorted(unique.values(), key=lambda r: frequency[r.parent_chunk.id], reverse=True)
+
+
+def _filter_by_indices(results: list[RetrievalResult], cited_indices: list[int]) -> list[RetrievalResult]:
+    cited = [results[i - 1] for i in cited_indices if 1 <= i <= len(results)]
+    return cited if cited else results
 
 
 def _build_citations(results: list[RetrievalResult]) -> list[Citation]:

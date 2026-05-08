@@ -8,10 +8,10 @@ def build_context(results: list[RetrievalResult]) -> str:
     Expects a flat list — callers are responsible for deduplication and ordering.
     """
     parts = []
-    for r in results:
+    for i, r in enumerate(results, start=1):
         f = r.filing
         label = (
-            f"[{f.ticker} | {f.form_type} | "
+            f"[{i}] [{f.ticker} | {f.form_type} | "
             f"{f.fiscal_year_end or f.filing_date} | {r.parent_chunk.section}]"
         )
         parts.append(f"{label}\n{r.parent_chunk.text}")
