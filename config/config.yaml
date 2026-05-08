@@ -104,7 +104,7 @@ generation:
   multi_hop:
     max_hops: 3                 # max retrieval rounds before forcing an answer
   eval_stop_after: null          # stop after this node in eval runs; null = run to completion
-                                 # valid values: analyze_query | hyde_expand | retrieve | check_hop | generate | reflect
+                                 # valid values: classify_query | plan_tasks | hyde_expand | retrieve | check_hop | generate | reflect
 
 
 # ── Logging ───────────────────────────────────────────────────────────────────
