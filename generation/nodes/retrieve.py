@@ -2,6 +2,8 @@ import logging
 from collections.abc import Callable
 from typing import TypedDict
 
+from generation.nodes._stream import get_writer
+
 from etl.embedder.base import Embedder
 from retrieval.retriever import Retriever
 from generation.types import RetrievalTask
@@ -18,6 +20,16 @@ def make_retrieve(retriever: Retriever, embedder: Embedder) -> Callable[[Retriev
     def retrieve(state: RetrieveInput) -> dict:
         task = state["task"]
         hyde_query = state["hyde_query"]
+
+        write = get_writer()
+        f = task.filter
+        if f and (f.ticker or f.form_type):
+            parts = [p for p in [f.ticker, f.form_type] if p]
+            if f.fiscal_year_end:
+                parts.append(f"({f.fiscal_year_end.year})")
+            write(f"Searching {' '.join(parts)}...")
+        else:
+            write(f"Searching: {task.query[:60]}...")
 
         # Embed hyde_query for vector search when available — the hypothetical passage
         # is closer in embedding space to relevant chunks than the raw question.

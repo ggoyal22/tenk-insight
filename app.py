@@ -87,10 +87,17 @@ def submit_query(query: str, graph) -> None:
 
     with st.chat_message("assistant"):
         try:
-            with st.spinner("Thinking..."):
+            with st.status("Processing...", expanded=True) as status:
                 state = make_initial_state(query, history=st.session_state.history)
-                result_state = graph.invoke(state)
-                result: GenerationResult | None = result_state["answer"]
+                result: GenerationResult | None = None
+                for mode, data in graph.stream(state, stream_mode=["updates", "custom"]):
+                    if mode == "custom":
+                        status.write(data)
+                    elif mode == "updates":
+                        for node_output in data.values():
+                            if isinstance(node_output, dict) and "answer" in node_output:
+                                result = node_output["answer"]
+                status.update(label="Done", state="complete", expanded=False)
         except Exception:
             logger.exception("Pipeline error for query: %r", query)
             content = "Something went wrong while processing your question. Please try again."

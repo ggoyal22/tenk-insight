@@ -1,6 +1,8 @@
 import logging
 from collections.abc import Callable
 
+from generation.nodes._stream import get_writer
+
 from config.loader import GenerationConfig
 from llm.base import BaseLLM
 from llm.types import Message
@@ -12,6 +14,7 @@ logger = logging.getLogger(__name__)
 
 def make_check_hop(llm: BaseLLM, config: GenerationConfig, prompt: str) -> Callable[[GenerationState], dict]:
     def check_hop(state: GenerationState) -> dict:
+        get_writer()("Evaluating whether more retrieval is needed...")
         context = build_context([r for group in state["completed_results"] for r in group])
         messages = [
             Message(role="system", content=prompt),

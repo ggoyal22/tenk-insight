@@ -1,6 +1,8 @@
 import logging
 from collections.abc import Callable
 
+from generation.nodes._stream import get_writer
+
 from llm.base import BaseLLM
 from llm.types import Message
 from generation.types import GenerationState, QueryAnalysis
@@ -10,12 +12,16 @@ logger = logging.getLogger(__name__)
 
 def make_analyze_query(llm: BaseLLM, prompt: str) -> Callable[[GenerationState], dict]:
     def analyze_query(state: GenerationState) -> dict:
+        write = get_writer()
+        write("Analyzing your question...")
         messages = [
             Message(role="system", content=prompt),
             Message(role="user", content=_build_user_message(state)),
         ]
         response = llm.chat_structured(messages, QueryAnalysis)
         analysis = response.parsed
+        n = len(analysis.tasks)
+        write(f"Classified as **{analysis.query_type}** — {n} search task{'s' if n != 1 else ''} planned")
 
         logger.debug(
             "Query classified as %r with %d task(s).",

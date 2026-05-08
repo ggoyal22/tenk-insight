@@ -2,6 +2,8 @@ import logging
 from collections.abc import Callable
 from uuid import UUID
 
+from generation.nodes._stream import get_writer
+
 from llm.base import BaseLLM
 from llm.types import Message
 from generation.nodes._context import build_context
@@ -18,6 +20,7 @@ def make_generate(
     time_series_prompt: str,
 ) -> Callable[[GenerationState], dict]:
     def generate(state: GenerationState) -> dict:
+        get_writer()("Generating answer...")
         prompt = _select_prompt(state["query_type"], qa_prompt, comparison_prompt, time_series_prompt)
         results = _deduplicate(state["completed_results"])
         context = build_context(results)
