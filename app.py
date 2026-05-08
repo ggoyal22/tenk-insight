@@ -19,8 +19,8 @@ from config.loader import load_config
 from db.factory import create_db_client, create_filings_repo
 from etl.factory import create_embedder
 from generation.factory import build_generation_pipeline, make_initial_state
-from generation.types import Citation, GenerationResult
-from llm.types import Message
+from generation.types import Citation, GenerationResult, total_pipeline_usage
+from llm.types import LLMUsage, Message
 from tracing.setup import setup_tracing
 
 logger = logging.getLogger(__name__)
@@ -90,13 +90,18 @@ def submit_query(query: str, graph) -> None:
             with st.status("Processing...", expanded=True) as status:
                 state = make_initial_state(query, history=st.session_state.history)
                 result: GenerationResult | None = None
+                pipeline_usage: list[LLMUsage] = []
                 for mode, data in graph.stream(state, stream_mode=["updates", "custom"]):
                     if mode == "custom":
                         status.write(data)
                     elif mode == "updates":
                         for node_output in data.values():
-                            if isinstance(node_output, dict) and "answer" in node_output:
+                            if not isinstance(node_output, dict):
+                                continue
+                            if "answer" in node_output:
                                 result = node_output["answer"]
+                            if "pipeline_usage" in node_output:
+                                pipeline_usage.extend(node_output["pipeline_usage"])
                 status.update(label="Done", state="complete", expanded=False)
         except Exception:
             logger.exception("Pipeline error for query: %r", query)
@@ -111,20 +116,19 @@ def submit_query(query: str, graph) -> None:
             st.session_state.messages.append({"role": "assistant", "content": content})
             return
 
+        usage = total_pipeline_usage(pipeline_usage)
         st.markdown(result.answer)
         citations = [_citation_to_dict(c) for c in result.citations]
         render_citations(citations)
-        st.caption(
-            f"{result.usage.input_tokens} in / {result.usage.output_tokens} out tokens"
-        )
+        st.caption(f"{usage.input_tokens} in / {usage.output_tokens} out tokens")
 
         st.session_state.messages.append({
             "role": "assistant",
             "content": result.answer,
             "citations": citations,
             "usage": {
-                "input_tokens": result.usage.input_tokens,
-                "output_tokens": result.usage.output_tokens,
+                "input_tokens": usage.input_tokens,
+                "output_tokens": usage.output_tokens,
             },
         })
         st.session_state.history.append(Message(role="user", content=query))

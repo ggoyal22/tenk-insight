@@ -19,6 +19,6 @@ def make_hyde_expand(llm: BaseLLM, prompt: str) -> Callable[[GenerationState], d
         ]
         response = llm.chat(messages)
         logger.debug("HyDE passage generated (%d chars).", len(response.content))
-        return {"hyde_query": response.content}
+        return {"hyde_query": response.content, "pipeline_usage": [response.usage]}
 
     return hyde_expand

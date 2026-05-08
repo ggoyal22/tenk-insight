@@ -17,6 +17,9 @@ class LLMUsage:
     input_tokens: int
     output_tokens: int
 
+    def __add__(self, other: "LLMUsage") -> "LLMUsage":
+        return LLMUsage(self.input_tokens + other.input_tokens, self.output_tokens + other.output_tokens)
+
 
 @dataclass
 class LLMResponse:

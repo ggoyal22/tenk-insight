@@ -53,6 +53,7 @@ def make_reflect(llm: BaseLLM, config: GenerationConfig, prompt: str) -> Callabl
             "pending_tasks": pending_tasks,
             "reflection_count": state["reflection_count"] + 1,
             "retrieval_triggered_by": "reflect",
+            "pipeline_usage": [response.usage],
         }
 
     return reflect

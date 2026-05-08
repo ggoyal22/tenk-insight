@@ -55,6 +55,7 @@ def make_initial_state(query: str, history=None, query_filter=None) -> dict:
         "pending_tasks": [],
         "hyde_query": None,
         "completed_results": [],
+        "pipeline_usage": [],
         "hop_count": 0,
         "reflection_count": 0,
         "retrieval_triggered_by": "analysis",

@@ -32,6 +32,7 @@ def make_analyze_query(llm: BaseLLM, prompt: str) -> Callable[[GenerationState],
             "query_type": analysis.query_type,
             "pending_tasks": analysis.tasks,
             "retrieval_triggered_by": "analysis",
+            "pipeline_usage": [response.usage],
         }
 
     return analyze_query

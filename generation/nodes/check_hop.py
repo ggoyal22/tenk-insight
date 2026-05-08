@@ -43,6 +43,7 @@ def make_check_hop(llm: BaseLLM, config: GenerationConfig, prompt: str) -> Calla
             "pending_tasks": pending_tasks,
             "hop_count": state["hop_count"] + 1,
             "retrieval_triggered_by": "check_hop",
+            "pipeline_usage": [response.usage],
         }
 
     return check_hop

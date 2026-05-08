@@ -63,7 +63,11 @@ class Citation:
 class GenerationResult:
     answer: str
     citations: list[Citation]
-    usage: LLMUsage
+
+
+def total_pipeline_usage(usages: list[LLMUsage]) -> LLMUsage:
+    """Sum all LLM usage records accumulated across the pipeline."""
+    return sum(usages, LLMUsage(0, 0))
 
 
 # ── LangGraph state ───────────────────────────────────────────────────────────
@@ -79,6 +83,8 @@ class GenerationState(TypedDict):
     # Reducer appends each retrieve node's result list — preserves which results
     # came from which task so generate can build per-source citations.
     completed_results: Annotated[list[list[RetrievalResult]], operator.add]
+    # Reducer accumulates LLM usage across all nodes; generate sums it for the final total.
+    pipeline_usage: Annotated[list[LLMUsage], operator.add]
     hop_count: int
     reflection_count: int
     retrieval_triggered_by: Literal["analysis", "check_hop", "reflect"]

@@ -39,11 +39,13 @@ def make_generate(
             len(response.parsed.answer), len(citations),
         )
 
-        return {"answer": GenerationResult(
-            answer=response.parsed.answer,
-            citations=citations,
-            usage=response.usage,
-        )}
+        return {
+            "answer": GenerationResult(
+                answer=response.parsed.answer,
+                citations=citations,
+            ),
+            "pipeline_usage": [response.usage],
+        }
 
     return generate
 
