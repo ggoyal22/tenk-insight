@@ -199,7 +199,7 @@ class GenerationConfig(BaseModel):
     hyde: HydeConfig = Field(default_factory=HydeConfig)
     reflection: ReflectionConfig = Field(default_factory=ReflectionConfig)
     multi_hop: MultiHopConfig = Field(default_factory=MultiHopConfig)
-    eval_stop_after: Literal["analyze_query", "hyde_expand", "retrieve", "check_hop", "generate", "reflect"] | None = None
+    eval_stop_after: Literal["classify_query", "plan_tasks", "hyde_expand", "retrieve", "check_hop", "generate", "reflect"] | None = None
 
 
 class LoggingConfig(BaseModel):

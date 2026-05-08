@@ -15,9 +15,10 @@ from generation.types import (
     GenerationResult,
     GenerationState,
     HopDecision,
-    QueryAnalysis,
+    QueryClassification,
     ReflectionDecision,
     RetrievalTask,
+    TaskPlan,
 )
 from llm.types import LLMUsage
 from retrieval.types import MetadataFilter
@@ -45,30 +46,55 @@ def test_retrieval_task_has_json_schema():
 
 
 # ---------------------------------------------------------------------------
-# QueryAnalysis
+# QueryClassification
 # ---------------------------------------------------------------------------
 
-def test_query_analysis_valid():
-    task = RetrievalTask(query="NVDA revenue 2024", filter=MetadataFilter(ticker="NVDA"))
-    qa = QueryAnalysis(query_type="single", tasks=[task])
-    assert qa.query_type == "single"
-    assert len(qa.tasks) == 1
+def test_query_classification_valid():
+    qc = QueryClassification(query_type="single", resolved_query="What was NVDA's revenue in 2024?")
+    assert qc.query_type == "single"
+    assert qc.resolved_query == "What was NVDA's revenue in 2024?"
 
 
-def test_query_analysis_rejects_invalid_query_type():
+def test_query_classification_rejects_invalid_query_type():
     with pytest.raises(ValidationError):
-        QueryAnalysis(query_type="unknown", tasks=[])
+        QueryClassification(query_type="unknown", resolved_query="query")
 
 
 @pytest.mark.parametrize("qt", ["single", "comparison", "time_series", "multi_hop", "out_of_scope"])
-def test_query_analysis_accepts_all_valid_types(qt):
-    qa = QueryAnalysis(query_type=qt, tasks=[])
-    assert qa.query_type == qt
+def test_query_classification_accepts_all_valid_types(qt):
+    qc = QueryClassification(query_type=qt, resolved_query="query")
+    assert qc.query_type == qt
 
 
-def test_query_analysis_has_json_schema():
-    schema = QueryAnalysis.model_json_schema()
+def test_query_classification_has_json_schema():
+    schema = QueryClassification.model_json_schema()
     assert "query_type" in schema["properties"]
+    assert "resolved_query" in schema["properties"]
+
+
+def test_query_classification_resolved_query_has_description_in_schema():
+    schema = QueryClassification.model_json_schema()
+    assert "description" in schema["properties"]["resolved_query"]
+
+
+# ---------------------------------------------------------------------------
+# TaskPlan
+# ---------------------------------------------------------------------------
+
+def test_task_plan_holds_tasks():
+    task = RetrievalTask(query="NVDA revenue 2024", filter=MetadataFilter(ticker="NVDA"))
+    plan = TaskPlan(tasks=[task])
+    assert len(plan.tasks) == 1
+    assert plan.tasks[0].query == "NVDA revenue 2024"
+
+
+def test_task_plan_accepts_empty_tasks():
+    plan = TaskPlan(tasks=[])
+    assert plan.tasks == []
+
+
+def test_task_plan_has_json_schema():
+    schema = TaskPlan.model_json_schema()
     assert "tasks" in schema["properties"]
 
 
@@ -143,23 +169,22 @@ def test_citation_fields():
 
 
 def test_generation_result_fields():
-    usage = LLMUsage(input_tokens=100, output_tokens=200)
-    result = GenerationResult(answer="NVDA revenue was $60.9B.", citations=[], usage=usage)
+    result = GenerationResult(answer="NVDA revenue was $60.9B.", citations=[])
     assert result.answer == "NVDA revenue was $60.9B."
-    assert result.usage.input_tokens == 100
+    assert result.citations == []
 
 
 # ---------------------------------------------------------------------------
 # Pydantic models are usable as chat_structured schemas
 # ---------------------------------------------------------------------------
 
-@pytest.mark.parametrize("cls", [QueryAnalysis, HopDecision, ReflectionDecision])
+@pytest.mark.parametrize("cls", [QueryClassification, TaskPlan, HopDecision, ReflectionDecision])
 def test_llm_output_types_have_json_schema(cls):
     schema = cls.model_json_schema()
     assert isinstance(schema, dict)
     assert "properties" in schema
 
 
-@pytest.mark.parametrize("cls", [QueryAnalysis, HopDecision, ReflectionDecision])
+@pytest.mark.parametrize("cls", [QueryClassification, TaskPlan, HopDecision, ReflectionDecision])
 def test_llm_output_types_are_pydantic_models(cls):
     assert issubclass(cls, BaseModel)

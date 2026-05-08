@@ -4,10 +4,11 @@ from db.factory import create_filings_repo
 from etl.embedder.base import Embedder
 from generation.graph import build_graph
 from generation.nodes import (
-    make_analyze_query,
     make_check_hop,
+    make_classify_query,
     make_generate,
     make_hyde_expand,
+    make_plan_tasks,
     make_reflect,
     make_retrieve,
 )
@@ -36,8 +37,16 @@ def build_generation_pipeline(config: AppConfig, db_client: DatabaseClient, embe
     retriever = build_retriever_from_config(config, db_client)
     prompts = load_prompts(tag=config.prompts.tag)
 
+    plan_prompts = {
+        "single": prompts.plan_single,
+        "comparison": prompts.plan_comparison,
+        "time_series": prompts.plan_time_series,
+        "multi_hop": prompts.plan_multi_hop,
+    }
+
     return build_graph(
-        analyze_query_fn=make_analyze_query(llm, prompts.query_analysis, filings_repo),
+        classify_query_fn=make_classify_query(llm, prompts.classify),
+        plan_tasks_fn=make_plan_tasks(llm, plan_prompts, filings_repo),
         hyde_expand_fn=make_hyde_expand(llm, prompts.hyde),
         retrieve_fn=make_retrieve(retriever, embedder),
         generate_fn=make_generate(llm, prompts.qa, prompts.comparison, prompts.time_series),
@@ -54,6 +63,7 @@ def make_initial_state(query: str, history=None, query_filter=None) -> dict:
         "history": history or [],
         "query_filter": query_filter,
         "query_type": "",
+        "resolved_query": None,
         "pending_tasks": [],
         "hyde_query": None,
         "completed_results": [],

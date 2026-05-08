@@ -86,7 +86,7 @@ class PhoenixExtractor(BaseExtractor):
             root_input = json.loads(spans["LangGraph"][0]["input"]["value"])
             user_input: str = root_input["query"]
 
-            # query_type is set by analyze_query mid-run; read from output, not input
+            # query_type is set by classify_query mid-run; read from output, not input
             root_output = json.loads(spans["LangGraph"][0]["output"]["value"])
             query_type: str = root_output.get("query_type", "")
 

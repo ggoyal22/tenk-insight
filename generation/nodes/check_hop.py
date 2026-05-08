@@ -21,7 +21,7 @@ def make_check_hop(llm: BaseLLM, config: GenerationConfig, prompt: str) -> Calla
             Message(
                 role="user",
                 content=(
-                    f"Question: {state['query']}\n\n"
+                    f"Question: {state.get('resolved_query') or state['query']}\n\n"
                     f"Context retrieved so far (hop {state['hop_count'] + 1} of {config.multi_hop.max_hops}):\n"
                     f"{context}"
                 ),

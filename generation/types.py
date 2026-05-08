@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from datetime import date
 from typing import Annotated, Literal, TypedDict
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from llm.types import LLMUsage, Message
 from retrieval.types import MetadataFilter, RetrievalResult
@@ -19,9 +19,21 @@ class RetrievalTask(BaseModel):
     filter: MetadataFilter | None = None
 
 
-class QueryAnalysis(BaseModel):
-    """Structured output of the analyze_query node."""
+class QueryClassification(BaseModel):
+    """Structured output of the classify_query node."""
     query_type: Literal["single", "comparison", "time_series", "multi_hop", "out_of_scope"]
+    resolved_query: str = Field(
+        description=(
+            "Self-contained rewrite of the query resolving any pronouns or references "
+            "from conversation history (e.g. 'that', 'their', 'the same'). "
+            "Normalise company names to ticker symbols (Apple → AAPL, Tesla → TSLA). "
+            "Copy verbatim if the query is already self-contained and uses ticker symbols."
+        )
+    )
+
+
+class TaskPlan(BaseModel):
+    """Structured output of the plan_tasks node."""
     tasks: list[RetrievalTask]
 
 
@@ -78,6 +90,7 @@ class GenerationState(TypedDict):
     # Renamed from 'filter' to avoid shadowing the Python builtin.
     query_filter: MetadataFilter | None
     query_type: str
+    resolved_query: str | None
     pending_tasks: list[RetrievalTask]
     hyde_query: str | None
     # Reducer appends each retrieve node's result list — preserves which results

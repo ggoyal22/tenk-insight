@@ -22,7 +22,7 @@ def make_reflect(llm: BaseLLM, config: GenerationConfig, prompt: str) -> Callabl
             Message(
                 role="user",
                 content=(
-                    f"Question: {state['query']}\n\n"
+                    f"Question: {state.get('resolved_query') or state['query']}\n\n"
                     f"Answer:\n{answer.answer}\n\n"
                     f"Context:\n{context}"
                 ),

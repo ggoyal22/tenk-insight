@@ -2,13 +2,15 @@
 Tests for generation nodes. All LLM and retriever calls are mocked.
 """
 
-from datetime import date
+import uuid
+from datetime import date, datetime
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 from config.loader import GenerationConfig
-from generation.nodes.analyze import make_analyze_query
+from generation.nodes.classify import make_classify_query
+from generation.nodes.plan import make_plan_tasks
 from generation.nodes.check_hop import make_check_hop
 from generation.nodes.generate import make_generate, _select_prompt, _filter_by_indices
 from generation.nodes.hyde import make_hyde_expand
@@ -16,7 +18,7 @@ from generation.nodes.reflect import make_reflect
 from generation.nodes.retrieve import make_retrieve, RetrieveInput
 from generation.types import (
     Citation, GenerationResponse, GenerationResult, GenerationState,
-    HopDecision, QueryAnalysis, ReflectionDecision, RetrievalTask,
+    HopDecision, QueryClassification, ReflectionDecision, RetrievalTask, TaskPlan,
 )
 from llm.base import LLMError
 from llm.types import LLMResponse, LLMUsage, Message, StructuredResponse
@@ -24,13 +26,18 @@ from retrieval.types import MetadataFilter, RetrievalResult
 from db.models import ChunkRecord, FilingRecord, ParentChunkRecord
 from tests.conftest import VALID_GENERATION
 
-import uuid
-from datetime import datetime
-
 
 # ---------------------------------------------------------------------------
 # Shared fixtures and helpers
 # ---------------------------------------------------------------------------
+
+_PLAN_PROMPTS = {
+    "single": "Plan single-company tasks.",
+    "comparison": "Plan comparison tasks.",
+    "time_series": "Plan time-series tasks.",
+    "multi_hop": "Plan multi-hop tasks.",
+}
+
 
 def _make_llm(chat_return=None, structured_return=None) -> MagicMock:
     llm = MagicMock()
@@ -43,6 +50,18 @@ def _make_llm(chat_return=None, structured_return=None) -> MagicMock:
 
 def _make_usage() -> LLMUsage:
     return LLMUsage(input_tokens=10, output_tokens=20)
+
+
+def _make_filings_repo(tickers_in_db: list[str] | None = None) -> MagicMock:
+    repo = MagicMock()
+    if tickers_in_db is None:
+        repo.list_ids.return_value = [uuid.uuid4()]
+    else:
+        tickers_upper = {t.upper() for t in tickers_in_db}
+        repo.list_ids.side_effect = lambda filters: (
+            [uuid.uuid4()] if filters.get("ticker") in tickers_upper else []
+        )
+    return repo
 
 
 def _make_filing() -> FilingRecord:
@@ -101,6 +120,7 @@ def _base_state(**overrides) -> dict:
         "history": [],
         "query_filter": None,
         "query_type": "single",
+        "resolved_query": None,
         "pending_tasks": [],
         "hyde_query": None,
         "completed_results": [],
@@ -119,27 +139,26 @@ def _gen_config(**overrides) -> GenerationConfig:
 
 
 # ---------------------------------------------------------------------------
-# analyze_query
+# classify_query
 # ---------------------------------------------------------------------------
 
-def test_analyze_query_returns_query_type_and_tasks():
-    task = RetrievalTask(query="NVDA revenue 2024", filter=MetadataFilter(ticker="NVDA"))
-    analysis = QueryAnalysis(query_type="single", tasks=[task])
-    llm = _make_llm(structured_return=StructuredResponse(parsed=analysis, usage=_make_usage()))
+def test_classify_query_returns_query_type_and_resolved_query():
+    classification = QueryClassification(query_type="single", resolved_query="What was NVDA's revenue in 2024?")
+    llm = _make_llm(structured_return=StructuredResponse(parsed=classification, usage=_make_usage()))
 
-    node = make_analyze_query(llm, "Analyse the query.")
+    node = make_classify_query(llm, "Classify the query.")
     result = node(_base_state())
 
     assert result["query_type"] == "single"
-    assert len(result["pending_tasks"]) == 1
+    assert result["resolved_query"] == "What was NVDA's revenue in 2024?"
     assert result["retrieval_triggered_by"] == "analysis"
 
 
-def test_analyze_query_passes_system_prompt():
-    analysis = QueryAnalysis(query_type="out_of_scope", tasks=[])
-    llm = _make_llm(structured_return=StructuredResponse(parsed=analysis, usage=_make_usage()))
+def test_classify_query_passes_system_prompt():
+    classification = QueryClassification(query_type="out_of_scope", resolved_query="weather today")
+    llm = _make_llm(structured_return=StructuredResponse(parsed=classification, usage=_make_usage()))
 
-    node = make_analyze_query(llm, "Analyse the query.")
+    node = make_classify_query(llm, "Classify the query.")
     node(_base_state())
 
     messages = llm.chat_structured.call_args[0][0]
@@ -147,11 +166,11 @@ def test_analyze_query_passes_system_prompt():
     assert len(messages[0].content) > 0
 
 
-def test_analyze_query_includes_filter_in_user_message():
-    analysis = QueryAnalysis(query_type="single", tasks=[])
-    llm = _make_llm(structured_return=StructuredResponse(parsed=analysis, usage=_make_usage()))
+def test_classify_query_includes_filter_in_user_message():
+    classification = QueryClassification(query_type="single", resolved_query="NVDA revenue")
+    llm = _make_llm(structured_return=StructuredResponse(parsed=classification, usage=_make_usage()))
 
-    node = make_analyze_query(llm, "Analyse the query.")
+    node = make_classify_query(llm, "Classify the query.")
     node(_base_state(query_filter=MetadataFilter(ticker="NVDA")))
 
     messages = llm.chat_structured.call_args[0][0]
@@ -159,16 +178,102 @@ def test_analyze_query_includes_filter_in_user_message():
     assert "NVDA" in user_msg
 
 
-def test_analyze_query_includes_history_in_user_message():
-    analysis = QueryAnalysis(query_type="single", tasks=[])
-    llm = _make_llm(structured_return=StructuredResponse(parsed=analysis, usage=_make_usage()))
+def test_classify_query_includes_history_in_user_message():
+    classification = QueryClassification(query_type="single", resolved_query="NVDA revenue")
+    llm = _make_llm(structured_return=StructuredResponse(parsed=classification, usage=_make_usage()))
     history = [Message(role="user", content="Prior question")]
 
-    node = make_analyze_query(llm, "Analyse the query.")
+    node = make_classify_query(llm, "Classify the query.")
     node(_base_state(history=history))
 
     messages = llm.chat_structured.call_args[0][0]
     assert "Prior question" in messages[1].content
+
+
+def test_classify_query_out_of_scope_sets_canned_answer():
+    classification = QueryClassification(query_type="out_of_scope", resolved_query="What is the weather?")
+    llm = _make_llm(structured_return=StructuredResponse(parsed=classification, usage=_make_usage()))
+
+    node = make_classify_query(llm, "Classify the query.")
+    result = node(_base_state(query="What is the weather?"))
+
+    assert isinstance(result.get("answer"), GenerationResult)
+    assert "can't be answered from SEC 10-K filings" in result["answer"].answer
+
+
+# ---------------------------------------------------------------------------
+# plan_tasks
+# ---------------------------------------------------------------------------
+
+def test_plan_tasks_returns_tasks():
+    task = RetrievalTask(query="NVDA revenue 2024", filter=MetadataFilter(ticker="NVDA"))
+    plan = TaskPlan(tasks=[task])
+    llm = _make_llm(structured_return=StructuredResponse(parsed=plan, usage=_make_usage()))
+
+    node = make_plan_tasks(llm, _PLAN_PROMPTS, _make_filings_repo())
+    result = node(_base_state(query_type="single"))
+
+    assert len(result["pending_tasks"]) == 1
+    assert result["pending_tasks"][0].query == "NVDA revenue 2024"
+
+
+def test_plan_tasks_uses_resolved_query_in_user_message():
+    plan = TaskPlan(tasks=[RetrievalTask(query="NVDA revenue fiscal 2024")])
+    llm = _make_llm(structured_return=StructuredResponse(parsed=plan, usage=_make_usage()))
+
+    node = make_plan_tasks(llm, _PLAN_PROMPTS, _make_filings_repo())
+    node(_base_state(query_type="single", resolved_query="What was NVDA's revenue in FY2024?"))
+
+    messages = llm.chat_structured.call_args[0][0]
+    user_msg = messages[1].content
+    assert "FY2024" in user_msg
+
+
+def test_plan_tasks_falls_back_to_raw_query_when_no_resolved_query():
+    plan = TaskPlan(tasks=[RetrievalTask(query="NVDA revenue")])
+    llm = _make_llm(structured_return=StructuredResponse(parsed=plan, usage=_make_usage()))
+
+    node = make_plan_tasks(llm, _PLAN_PROMPTS, _make_filings_repo())
+    node(_base_state(query_type="single", query="NVDA revenue?", resolved_query=None))
+
+    messages = llm.chat_structured.call_args[0][0]
+    user_msg = messages[1].content
+    assert "NVDA revenue" in user_msg
+
+
+def test_plan_tasks_no_tasks_returns_canned_answer():
+    llm = _make_llm(structured_return=StructuredResponse(parsed=TaskPlan(tasks=[]), usage=_make_usage()))
+
+    node = make_plan_tasks(llm, _PLAN_PROMPTS, _make_filings_repo())
+    result = node(_base_state(query_type="single"))
+
+    assert isinstance(result.get("answer"), GenerationResult)
+    assert "trouble understanding" in result["answer"].answer
+    assert result["pending_tasks"] == []
+
+
+def test_plan_tasks_unknown_ticker_returns_canned_answer():
+    task = RetrievalTask(query="FAKE revenue", filter=MetadataFilter(ticker="FAKE"))
+    llm = _make_llm(structured_return=StructuredResponse(parsed=TaskPlan(tasks=[task]), usage=_make_usage()))
+
+    node = make_plan_tasks(llm, _PLAN_PROMPTS, _make_filings_repo(tickers_in_db=[]))
+    result = node(_base_state(query_type="single"))
+
+    assert isinstance(result.get("answer"), GenerationResult)
+    assert "FAKE" in result["answer"].answer
+    assert "don't have filings" in result["answer"].answer
+    assert result["pending_tasks"] == []
+
+
+def test_plan_tasks_selects_prompt_by_query_type():
+    plan = TaskPlan(tasks=[RetrievalTask(query="NVDA vs AMD revenue")])
+    llm = _make_llm(structured_return=StructuredResponse(parsed=plan, usage=_make_usage()))
+
+    node = make_plan_tasks(llm, _PLAN_PROMPTS, _make_filings_repo())
+    node(_base_state(query_type="comparison"))
+
+    messages = llm.chat_structured.call_args[0][0]
+    assert messages[0].content == "Plan comparison tasks."
 
 
 # ---------------------------------------------------------------------------
@@ -190,6 +295,15 @@ def test_hyde_expand_sends_query_as_user_message():
     messages = llm.chat.call_args[0][0]
     assert messages[-1].role == "user"
     assert "NVDA revenue" in messages[-1].content
+
+
+def test_hyde_expand_uses_resolved_query_when_present():
+    llm = _make_llm(chat_return=LLMResponse(content="passage", usage=_make_usage()))
+    node = make_hyde_expand(llm, "Write a hypothetical passage.")
+    node(_base_state(query="nvda rev?", resolved_query="What was NVDA's revenue in FY2024?"))
+
+    messages = llm.chat.call_args[0][0]
+    assert "FY2024" in messages[-1].content
 
 
 # ---------------------------------------------------------------------------
@@ -418,7 +532,7 @@ def test_reflect_returns_empty_tasks_on_high_quality():
     decision = ReflectionDecision(quality="high", reason="complete and grounded")
     llm = _make_llm(structured_return=StructuredResponse(parsed=decision, usage=_make_usage()))
     result = _make_retrieval_result()
-    answer = GenerationResult(answer="Revenue was $60.9B.", citations=[], usage=_make_usage())
+    answer = GenerationResult(answer="Revenue was $60.9B.", citations=[])
 
     node = make_reflect(llm, _gen_config(), "Evaluate the answer quality.")
     output = node(_base_state(completed_results=[[result]], answer=answer, reflection_count=0))
@@ -433,7 +547,7 @@ def test_reflect_returns_next_task_on_low_quality():
     decision = ReflectionDecision(quality="low", reason="revenue figure missing", next_task=next_task)
     llm = _make_llm(structured_return=StructuredResponse(parsed=decision, usage=_make_usage()))
     result = _make_retrieval_result()
-    answer = GenerationResult(answer="Incomplete answer.", citations=[], usage=_make_usage())
+    answer = GenerationResult(answer="Incomplete answer.", citations=[])
 
     node = make_reflect(llm, _gen_config(), "Evaluate the answer quality.")
     output = node(_base_state(completed_results=[[result]], answer=answer, reflection_count=0))
@@ -446,7 +560,7 @@ def test_reflect_returns_empty_tasks_when_low_quality_but_no_next_task():
     decision = ReflectionDecision(quality="low", reason="out of scope", next_task=None)
     llm = _make_llm(structured_return=StructuredResponse(parsed=decision, usage=_make_usage()))
     result = _make_retrieval_result()
-    answer = GenerationResult(answer="Bad answer.", citations=[], usage=_make_usage())
+    answer = GenerationResult(answer="Bad answer.", citations=[])
 
     node = make_reflect(llm, _gen_config(), "Evaluate the answer quality.")
     output = node(_base_state(completed_results=[[result]], answer=answer, reflection_count=0))

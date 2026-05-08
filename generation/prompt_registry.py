@@ -15,10 +15,14 @@ from dataclasses import dataclass
 
 from generation.prompts import (
     CHECK_HOP_PROMPT,
+    CLASSIFY_PROMPT,
     COMPARISON_PROMPT,
     HYDE_PROMPT,
+    PLAN_COMPARISON_PROMPT,
+    PLAN_MULTI_HOP_PROMPT,
+    PLAN_SINGLE_PROMPT,
+    PLAN_TIME_SERIES_PROMPT,
     QA_PROMPT,
-    QUERY_ANALYSIS_PROMPT,
     REFLECTION_PROMPT,
     TIME_SERIES_PROMPT,
 )
@@ -26,7 +30,11 @@ from generation.prompts import (
 logger = logging.getLogger(__name__)
 
 _DEFAULTS: dict[str, str] = {
-    "query_analysis": QUERY_ANALYSIS_PROMPT,
+    "classify": CLASSIFY_PROMPT,
+    "plan_single": PLAN_SINGLE_PROMPT,
+    "plan_comparison": PLAN_COMPARISON_PROMPT,
+    "plan_time_series": PLAN_TIME_SERIES_PROMPT,
+    "plan_multi_hop": PLAN_MULTI_HOP_PROMPT,
     "hyde": HYDE_PROMPT,
     "qa": QA_PROMPT,
     "comparison": COMPARISON_PROMPT,
@@ -38,7 +46,11 @@ _DEFAULTS: dict[str, str] = {
 
 @dataclass(frozen=True)
 class Prompts:
-    query_analysis: str
+    classify: str
+    plan_single: str
+    plan_comparison: str
+    plan_time_series: str
+    plan_multi_hop: str
     hyde: str
     qa: str
     comparison: str

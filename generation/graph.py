@@ -12,7 +12,8 @@ logger = logging.getLogger(__name__)
 
 
 def build_graph(
-    analyze_query_fn: Callable,
+    classify_query_fn: Callable,
+    plan_tasks_fn: Callable,
     hyde_expand_fn: Callable,
     retrieve_fn: Callable,
     generate_fn: Callable,
@@ -31,12 +32,18 @@ def build_graph(
     # Each function reads state and returns either a node name (str), END, or
     # a list of Send objects for fan-out to the retrieve node.
 
-    def route_after_analyze(state: GenerationState):
-        if config.eval_stop_after == "analyze_query":
+    def route_after_classify(state: GenerationState):
+        if config.eval_stop_after == "classify_query":
+            return END
+        if state["query_type"] == "out_of_scope":
+            return END
+        return "plan_tasks"
+
+    def route_after_plan(state: GenerationState):
+        if config.eval_stop_after == "plan_tasks":
             return END
         tasks = state["pending_tasks"]
         if not tasks:
-            logger.debug("analyze_query produced no tasks — terminating early.")
             return END
         if config.hyde.enabled:
             return "hyde_expand"
@@ -95,15 +102,17 @@ def build_graph(
 
     g = StateGraph(GenerationState)
 
-    g.add_node("analyze_query", analyze_query_fn)
+    g.add_node("classify_query", classify_query_fn)
+    g.add_node("plan_tasks", plan_tasks_fn)
     g.add_node("hyde_expand", hyde_expand_fn)
     g.add_node("retrieve", retrieve_fn)
     g.add_node("generate", generate_fn)
     g.add_node("check_hop", check_hop_fn)
     g.add_node("reflect", reflect_fn)
 
-    g.set_entry_point("analyze_query")
-    g.add_conditional_edges("analyze_query", route_after_analyze)
+    g.set_entry_point("classify_query")
+    g.add_conditional_edges("classify_query", route_after_classify)
+    g.add_conditional_edges("plan_tasks", route_after_plan)
     g.add_conditional_edges("hyde_expand", route_after_hyde)
     g.add_conditional_edges("retrieve", route_after_retrieve)
     g.add_conditional_edges("check_hop", route_after_check_hop)

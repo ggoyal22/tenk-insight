@@ -15,7 +15,7 @@ def make_hyde_expand(llm: BaseLLM, prompt: str) -> Callable[[GenerationState], d
         get_writer()("Expanding search queries...")
         messages = [
             Message(role="system", content=prompt),
-            Message(role="user", content=state["query"]),
+            Message(role="user", content=state.get("resolved_query") or state["query"]),
         ]
         response = llm.chat(messages)
         logger.debug("HyDE passage generated (%d chars).", len(response.content))

@@ -33,23 +33,31 @@ from phoenix.client.types.prompts import PromptVersion
 
 from generation.prompts import (
     CHECK_HOP_PROMPT,
+    CLASSIFY_PROMPT,
     COMPARISON_PROMPT,
     HYDE_PROMPT,
+    PLAN_COMPARISON_PROMPT,
+    PLAN_MULTI_HOP_PROMPT,
+    PLAN_SINGLE_PROMPT,
+    PLAN_TIME_SERIES_PROMPT,
     QA_PROMPT,
-    QUERY_ANALYSIS_PROMPT,
     REFLECTION_PROMPT,
     TIME_SERIES_PROMPT,
 )
 
 # Maps Phoenix prompt name → (Python constant name, current value)
 _PROMPTS: dict[str, tuple[str, str]] = {
-    "query_analysis": ("QUERY_ANALYSIS_PROMPT", QUERY_ANALYSIS_PROMPT),
-    "hyde":           ("HYDE_PROMPT",            HYDE_PROMPT),
-    "qa":             ("QA_PROMPT",              QA_PROMPT),
-    "comparison":     ("COMPARISON_PROMPT",      COMPARISON_PROMPT),
-    "time_series":    ("TIME_SERIES_PROMPT",     TIME_SERIES_PROMPT),
-    "check_hop":      ("CHECK_HOP_PROMPT",       CHECK_HOP_PROMPT),
-    "reflection":     ("REFLECTION_PROMPT",      REFLECTION_PROMPT),
+    "classify":          ("CLASSIFY_PROMPT",          CLASSIFY_PROMPT),
+    "plan_single":       ("PLAN_SINGLE_PROMPT",       PLAN_SINGLE_PROMPT),
+    "plan_comparison":   ("PLAN_COMPARISON_PROMPT",   PLAN_COMPARISON_PROMPT),
+    "plan_time_series":  ("PLAN_TIME_SERIES_PROMPT",  PLAN_TIME_SERIES_PROMPT),
+    "plan_multi_hop":    ("PLAN_MULTI_HOP_PROMPT",    PLAN_MULTI_HOP_PROMPT),
+    "hyde":              ("HYDE_PROMPT",               HYDE_PROMPT),
+    "qa":                ("QA_PROMPT",                 QA_PROMPT),
+    "comparison":        ("COMPARISON_PROMPT",         COMPARISON_PROMPT),
+    "time_series":       ("TIME_SERIES_PROMPT",        TIME_SERIES_PROMPT),
+    "check_hop":         ("CHECK_HOP_PROMPT",          CHECK_HOP_PROMPT),
+    "reflection":        ("REFLECTION_PROMPT",         REFLECTION_PROMPT),
 }
 
 _PROMPTS_FILE = _ROOT / "generation" / "prompts.py"

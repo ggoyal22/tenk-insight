@@ -1,7 +1,7 @@
 # Golden Q&A pairs for comparison queries against NVDA 10-K FY2024.
 # Each question requires explicitly contrasting two values — across segments or years.
 #
-# Entries with answer: null are node-eval-only (analyze_query fixtures).
+# Entries with answer: null are node-eval-only (classify_query + plan_tasks fixtures).
 # They are skipped by the e2e eval pipeline and only used by scripts/eval_node.py.
 
 - query: "How did NVDA's Compute & Networking and Graphics segment revenues compare in fiscal year 2024?"

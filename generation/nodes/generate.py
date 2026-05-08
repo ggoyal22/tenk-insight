@@ -34,7 +34,7 @@ def make_generate(
 
         messages = [
             Message(role="system", content=prompt),
-            Message(role="user", content=f"Question: {state['query']}\n\nContext:\n{context}"),
+            Message(role="user", content=f"Question: {state.get('resolved_query') or state['query']}\n\nContext:\n{context}"),
         ]
 
         response = llm.chat_structured(messages, GenerationResponse)
