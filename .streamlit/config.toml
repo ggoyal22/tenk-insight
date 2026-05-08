@@ -1,4 +1,5 @@
 [server]
-# Disable module-path scanning to avoid noisy warnings from transformers
-# submodules that optionally depend on torchvision (not installed).
-fileWatcherType = "poll"
+fileWatcherType = "none"
+
+[logger]
+level = "error"
