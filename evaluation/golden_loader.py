@@ -73,6 +73,43 @@ def load_golden(path: str | None) -> dict[str, str]:
     raise ValueError(f"golden_path '{path}' is neither a file nor a directory.")
 
 
+def load_node_fixtures(path: str | None) -> list[dict]:
+    """Load all golden YAML entries as raw dicts for node-level evaluation.
+
+    Returns every entry that has 'query' and 'query_type', including entries with
+    answer: null (node-eval-only fixtures). Unlike load_golden(), returns full entry
+    dicts so callers can access expected_tasks, query_filter, etc.
+
+    path=None or a missing path → returns [] with a warning.
+    path is a file      → loads that file.
+    path is a directory → loads and merges all *.yaml files inside.
+    """
+    if path is None:
+        logger.warning("golden_path is not set — node eval fixtures will be empty")
+        return []
+
+    p = Path(path)
+    if not p.exists():
+        logger.warning("golden_path '%s' does not exist — node eval fixtures will be empty", path)
+        return []
+
+    files = [p] if p.is_file() else sorted(p.glob("*.yaml"))
+    fixtures: list[dict] = []
+    for f in files:
+        try:
+            with open(f) as fh:
+                entries = yaml.safe_load(fh) or []
+        except yaml.YAMLError as exc:
+            raise ValueError(f"Failed to parse golden file '{f}': {exc}") from exc
+        fixtures.extend(
+            e for e in entries
+            if isinstance(e, dict) and "query" in e and "query_type" in e
+        )
+
+    logger.info("Loaded %d node eval fixture(s) from '%s'", len(fixtures), path)
+    return fixtures
+
+
 def attach_references(samples: list[EvalSample], golden: dict[str, str]) -> None:
     """Set sample.reference for any sample whose user_input matches a golden entry.
 
@@ -123,7 +160,7 @@ def _load_file(path: Path) -> dict[str, str]:
                 f"Golden file '{path}': entry {i} must be a dict, "
                 f"got {type(entry).__name__}."
             )
-        missing = [f for f in ("query", "answer", "query_type") if f not in entry]
+        missing = [f for f in ("query", "query_type") if f not in entry]
         if missing:
             raise ValueError(
                 f"Golden file '{path}': entry {i} is missing required field(s) "
@@ -138,7 +175,9 @@ def _load_file(path: Path) -> dict[str, str]:
             raise ValueError(
                 f"Golden file '{path}': duplicate query at entry {i}: '{query}'."
             )
-        result[query] = str(entry["answer"])
+        answer = entry.get("answer")
+        if answer is not None:
+            result[query] = str(answer)
 
     logger.info("Loaded %d golden entries from '%s'", len(result), path)
     return result

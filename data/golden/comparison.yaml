@@ -1,5 +1,8 @@
 # Golden Q&A pairs for comparison queries against NVDA 10-K FY2024.
 # Each question requires explicitly contrasting two values — across segments or years.
+#
+# Entries with answer: null are node-eval-only (analyze_query fixtures).
+# They are skipped by the e2e eval pipeline and only used by scripts/eval_node.py.
 
 - query: "How did NVDA's Compute & Networking and Graphics segment revenues compare in fiscal year 2024?"
   query_type: comparison
@@ -26,3 +29,14 @@
     compared to $5,641 million in fiscal year 2023, an increase of approximately
     $22,449 million. The improvement was driven by the significant growth in net
     income from $4,368 million to $29,760 million over the same period.
+
+# --- node-eval-only entries (answer: null — skipped by e2e pipeline) ---
+
+- query: "Compare AAPL and MSFT revenue in fiscal year 2023"
+  query_type: comparison
+  answer: null
+  expected_tasks:
+    - filter:
+        ticker: AAPL
+    - filter:
+        ticker: MSFT

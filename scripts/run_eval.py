@@ -37,7 +37,9 @@ def _load_queries(golden_path: str | None, datasets: list[str]) -> list[str]:
         queries.extend(
             str(e["query"]).strip()
             for e in entries
-            if isinstance(e, dict) and e.get("query_type") in dataset_set
+            if isinstance(e, dict)
+            and e.get("query_type") in dataset_set
+            and e.get("answer") is not None
         )
     return queries
 

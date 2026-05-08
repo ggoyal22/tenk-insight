@@ -8,6 +8,7 @@ created, etc.).
 Logs the source (Phoenix or constant) for each prompt at INFO level.
 """
 
+import dataclasses
 import logging
 import os
 from dataclasses import dataclass
@@ -44,6 +45,7 @@ class Prompts:
     time_series: str
     check_hop: str
     reflection: str
+    versions: dict[str, str | None] = dataclasses.field(default_factory=dict)
 
 
 def load_prompts(tag: str | None = None) -> Prompts:
@@ -61,6 +63,7 @@ def load_prompts(tag: str | None = None) -> Prompts:
         return Prompts(**_DEFAULTS)
 
     resolved: dict[str, str] = {}
+    versions: dict[str, str | None] = {}
     tag_label = f" (tag={tag})" if tag else " (latest)"
 
     for name, fallback in _DEFAULTS.items():
@@ -70,14 +73,16 @@ def load_prompts(tag: str | None = None) -> Prompts:
                 kwargs["tag"] = tag
             pv = client.prompts.get(**kwargs)
             resolved[name] = _extract_system_message(pv)
+            versions[name] = pv.id
             logger.info("Loaded prompt '%s' from Phoenix%s", name, tag_label)
         except Exception as exc:
             resolved[name] = fallback
+            versions[name] = None
             logger.info(
                 "Prompt '%s' not in Phoenix (%s) — using hardcoded constant", name, exc
             )
 
-    return Prompts(**resolved)
+    return Prompts(**resolved, versions=versions)
 
 
 def _extract_system_message(prompt_version) -> str:
