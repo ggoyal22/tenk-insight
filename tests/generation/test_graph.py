@@ -20,7 +20,7 @@ from generation.nodes import (
     make_hyde_expand, make_reflect, make_retrieve,
 )
 from generation.types import (
-    GenerationResult, HopDecision, QueryAnalysis,
+    GenerationResponse, GenerationResult, HopDecision, QueryAnalysis,
     ReflectionDecision, RetrievalTask,
 )
 from llm.types import LLMResponse, LLMUsage, StructuredResponse
@@ -100,14 +100,24 @@ def test_single_query_produces_answer():
         reflection={"enabled": False, "max_iterations": 2},
     )
     llm = MagicMock()
-    llm.chat_structured.return_value = StructuredResponse(
-        parsed=QueryAnalysis(
-            query_type="single",
-            tasks=[RetrievalTask(query="NVDA revenue 2024")],
-        ),
-        usage=_usage(),
-    )
-    llm.chat.return_value = LLMResponse(content="Revenue was $60.9B.", usage=_usage())
+
+    def chat_structured_side_effect(messages, schema):
+        if schema == QueryAnalysis:
+            return StructuredResponse(
+                parsed=QueryAnalysis(
+                    query_type="single",
+                    tasks=[RetrievalTask(query="NVDA revenue 2024")],
+                ),
+                usage=_usage(),
+            )
+        if schema == GenerationResponse:
+            return StructuredResponse(
+                parsed=GenerationResponse(answer="Revenue was $60.9B.", cited_indices=[1]),
+                usage=_usage(),
+            )
+        raise ValueError(f"Unexpected schema: {schema}")
+
+    llm.chat_structured.side_effect = chat_structured_side_effect
 
     graph = _build_graph(llm, _make_retriever(), _make_embedder(), config)
     final = graph.invoke(make_initial_state("What was NVDA's revenue in 2024?"))
@@ -209,6 +219,11 @@ def test_hyde_passage_is_used_for_embedding():
                 ),
                 usage=_usage(),
             )
+        if schema == GenerationResponse:
+            return StructuredResponse(
+                parsed=GenerationResponse(answer="Revenue was $60.9B.", cited_indices=[1]),
+                usage=_usage(),
+            )
         raise ValueError(f"Unexpected schema: {schema}")
 
     llm.chat_structured.side_effect = chat_structured_side_effect
@@ -218,8 +233,8 @@ def test_hyde_passage_is_used_for_embedding():
     graph = _build_graph(llm, _make_retriever(), embedder, config)
     graph.invoke(make_initial_state("What was NVDA's revenue?"))
 
-    # First chat() call is hyde_expand, second is generate
-    assert llm.chat.call_count == 2
+    # hyde_expand uses chat(); generate now uses chat_structured()
+    assert llm.chat.call_count == 1
     # Embedder should have been called with the hypothetical passage, not the raw query
     embedded_text = embedder.embed.call_args[0][0][0]
     assert embedded_text == "Hypothetical passage."
@@ -246,6 +261,11 @@ def test_reflection_high_quality_ends_pipeline():
                 ),
                 usage=_usage(),
             )
+        if schema == GenerationResponse:
+            return StructuredResponse(
+                parsed=GenerationResponse(answer="Revenue was $60.9B.", cited_indices=[1]),
+                usage=_usage(),
+            )
         if schema == ReflectionDecision:
             return StructuredResponse(
                 parsed=ReflectionDecision(quality="high", reason="complete and grounded"),
@@ -254,7 +274,6 @@ def test_reflection_high_quality_ends_pipeline():
         raise ValueError(f"Unexpected schema: {schema}")
 
     llm.chat_structured.side_effect = chat_structured_side_effect
-    llm.chat.return_value = LLMResponse(content="Revenue was $60.9B.", usage=_usage())
 
     graph = _build_graph(llm, _make_retriever(), _make_embedder(), config)
     final = graph.invoke(make_initial_state("What was NVDA's revenue?"))
@@ -285,6 +304,11 @@ def test_reflection_low_quality_triggers_extra_retrieval():
                 ),
                 usage=_usage(),
             )
+        if schema == GenerationResponse:
+            return StructuredResponse(
+                parsed=GenerationResponse(answer="Answer.", cited_indices=[1]),
+                usage=_usage(),
+            )
         if schema == ReflectionDecision:
             reflection_calls["count"] += 1
             if reflection_calls["count"] == 1:
@@ -303,7 +327,6 @@ def test_reflection_low_quality_triggers_extra_retrieval():
         raise ValueError(f"Unexpected schema: {schema}")
 
     llm.chat_structured.side_effect = chat_structured_side_effect
-    llm.chat.return_value = LLMResponse(content="Answer.", usage=_usage())
 
     retriever = _make_retriever()
     graph = _build_graph(llm, retriever, _make_embedder(), config)
@@ -325,17 +348,27 @@ def test_comparison_query_fans_out_to_parallel_retrieves():
         reflection={"enabled": False, "max_iterations": 2},
     )
     llm = MagicMock()
-    llm.chat_structured.return_value = StructuredResponse(
-        parsed=QueryAnalysis(
-            query_type="comparison",
-            tasks=[
-                RetrievalTask(query="NVDA revenue", filter=MetadataFilter(ticker="NVDA")),
-                RetrievalTask(query="AMD revenue", filter=MetadataFilter(ticker="AMD")),
-            ],
-        ),
-        usage=_usage(),
-    )
-    llm.chat.return_value = LLMResponse(content="NVDA > AMD.", usage=_usage())
+
+    def chat_structured_side_effect(messages, schema):
+        if schema == QueryAnalysis:
+            return StructuredResponse(
+                parsed=QueryAnalysis(
+                    query_type="comparison",
+                    tasks=[
+                        RetrievalTask(query="NVDA revenue", filter=MetadataFilter(ticker="NVDA")),
+                        RetrievalTask(query="AMD revenue", filter=MetadataFilter(ticker="AMD")),
+                    ],
+                ),
+                usage=_usage(),
+            )
+        if schema == GenerationResponse:
+            return StructuredResponse(
+                parsed=GenerationResponse(answer="NVDA > AMD.", cited_indices=[1, 2]),
+                usage=_usage(),
+            )
+        raise ValueError(f"Unexpected schema: {schema}")
+
+    llm.chat_structured.side_effect = chat_structured_side_effect
 
     retriever = MagicMock()
     retriever.retrieve.side_effect = [
@@ -390,10 +423,14 @@ def test_multi_hop_triggers_extra_retrieval():
                 parsed=HopDecision(done=True),
                 usage=_usage(),
             )
+        if schema == GenerationResponse:
+            return StructuredResponse(
+                parsed=GenerationResponse(answer="Data center drove growth.", cited_indices=[1]),
+                usage=_usage(),
+            )
         raise ValueError(f"Unexpected schema: {schema}")
 
     llm.chat_structured.side_effect = chat_structured_side_effect
-    llm.chat.return_value = LLMResponse(content="Data center drove growth.", usage=_usage())
 
     retriever = _make_retriever()
     graph = _build_graph(llm, retriever, _make_embedder(), config)
@@ -417,6 +454,8 @@ def test_reflection_exhausted_terminates_after_max_iterations():
     )
     llm = MagicMock()
 
+    generation_calls = {"count": 0}
+
     def chat_structured_side_effect(messages, schema):
         if schema == QueryAnalysis:
             return StructuredResponse(
@@ -424,6 +463,12 @@ def test_reflection_exhausted_terminates_after_max_iterations():
                     query_type="single",
                     tasks=[RetrievalTask(query="NVDA revenue 2024")],
                 ),
+                usage=_usage(),
+            )
+        if schema == GenerationResponse:
+            generation_calls["count"] += 1
+            return StructuredResponse(
+                parsed=GenerationResponse(answer="Partial answer.", cited_indices=[1]),
                 usage=_usage(),
             )
         if schema == ReflectionDecision:
@@ -439,7 +484,6 @@ def test_reflection_exhausted_terminates_after_max_iterations():
         raise ValueError(f"Unexpected schema: {schema}")
 
     llm.chat_structured.side_effect = chat_structured_side_effect
-    llm.chat.return_value = LLMResponse(content="Partial answer.", usage=_usage())
 
     retriever = _make_retriever()
     graph = _build_graph(llm, retriever, _make_embedder(), config)
@@ -447,7 +491,7 @@ def test_reflection_exhausted_terminates_after_max_iterations():
 
     # Should stop after max_iterations reflections, not loop forever
     assert final["reflection_count"] == config.reflection.max_iterations
-    # generate was called once per reflection iteration (2 total)
-    assert llm.chat.call_count == config.reflection.max_iterations
+    # generate ran once per reflection iteration
+    assert generation_calls["count"] == config.reflection.max_iterations
     # Final answer is the last generated one, not None
     assert isinstance(final["answer"], GenerationResult)

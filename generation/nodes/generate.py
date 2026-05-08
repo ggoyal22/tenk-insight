@@ -25,13 +25,10 @@ def make_generate(
         results = _deduplicate(state["completed_results"])
         context = build_context(results)
 
-        messages = [Message(role="system", content=prompt)]
-        for msg in (state.get("history") or []):
-            messages.append(msg)
-        messages.append(Message(
-            role="user",
-            content=f"Question: {state['query']}\n\nContext:\n{context}",
-        ))
+        messages = [
+            Message(role="system", content=prompt),
+            Message(role="user", content=f"Question: {state['query']}\n\nContext:\n{context}"),
+        ]
 
         response = llm.chat_structured(messages, GenerationResponse)
         cited_results = _filter_by_indices(results, response.parsed.cited_indices)
