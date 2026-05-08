@@ -23,6 +23,13 @@ def make_generate(
         get_writer()("Generating answer...")
         prompt = _select_prompt(state["query_type"], qa_prompt, comparison_prompt, time_series_prompt)
         results = _deduplicate(state["completed_results"])
+
+        if not results:
+            return {"answer": GenerationResult(
+                answer="I found filings but couldn't locate relevant information. Try narrowing your question.",
+                citations=[],
+            )}
+
         context = build_context(results)
 
         messages = [

@@ -72,9 +72,22 @@ def _make_retriever(results=None) -> MagicMock:
     return retriever
 
 
-def _build_graph(llm, retriever, embedder, config: GenerationConfig):
+def _make_filings_repo(tickers_in_db: list[str] | None = None) -> MagicMock:
+    """Return a mock FilingsRepo. By default all tickers are considered indexed."""
+    repo = MagicMock()
+    if tickers_in_db is None:
+        repo.list_ids.return_value = [uuid.uuid4()]
+    else:
+        tickers_upper = {t.upper() for t in tickers_in_db}
+        repo.list_ids.side_effect = lambda filters: (
+            [uuid.uuid4()] if filters.get("ticker") in tickers_upper else []
+        )
+    return repo
+
+
+def _build_graph(llm, retriever, embedder, config: GenerationConfig, filings_repo=None):
     return build_graph(
-        analyze_query_fn=make_analyze_query(llm, "Analyse the query."),
+        analyze_query_fn=make_analyze_query(llm, "Analyse the query.", filings_repo or _make_filings_repo()),
         hyde_expand_fn=make_hyde_expand(llm, "Write a hypothetical passage."),
         retrieve_fn=make_retrieve(retriever, embedder),
         generate_fn=make_generate(llm, "Answer the question.", "Compare the companies.", "Analyse how."),
@@ -132,7 +145,7 @@ def test_single_query_produces_answer():
 # ---------------------------------------------------------------------------
 
 def test_out_of_scope_query_terminates_without_answer():
-    """analyze → END (no retrieval, no generation)"""
+    """analyze → END (no retrieval, no generation) with canned answer"""
     config = _gen_config(
         hyde={"enabled": False},
         reflection={"enabled": False, "max_iterations": 2},
@@ -146,7 +159,8 @@ def test_out_of_scope_query_terminates_without_answer():
     graph = _build_graph(llm, _make_retriever(), _make_embedder(), config)
     final = graph.invoke(make_initial_state("What is the weather today?"))
 
-    assert final["answer"] is None
+    assert isinstance(final["answer"], GenerationResult)
+    assert "can't be answered from SEC 10-K filings" in final["answer"].answer
     llm.chat.assert_not_called()  # generate node never ran
 
 
@@ -155,7 +169,7 @@ def test_out_of_scope_query_terminates_without_answer():
 # ---------------------------------------------------------------------------
 
 def test_empty_tasks_terminates_without_answer():
-    """analyze → END (query_type is 'single' but LLM returned no tasks)"""
+    """analyze → END (query_type is 'single' but LLM returned no tasks) with canned answer"""
     config = _gen_config(
         hyde={"enabled": False},
         reflection={"enabled": False, "max_iterations": 2},
@@ -169,33 +183,60 @@ def test_empty_tasks_terminates_without_answer():
     graph = _build_graph(llm, _make_retriever(), _make_embedder(), config)
     final = graph.invoke(make_initial_state("What was NVDA's revenue?"))
 
-    assert final["answer"] is None
+    assert isinstance(final["answer"], GenerationResult)
+    assert "trouble understanding" in final["answer"].answer
     llm.chat.assert_not_called()
 
 
-def test_empty_tasks_with_hyde_terminates_without_answer():
-    """analyze → hyde_expand → END (tasks empty after analysis)"""
+def test_empty_tasks_with_hyde_skips_hyde_and_returns_canned_answer():
+    """analyze → END (guard fires before HyDE when tasks are empty)"""
     config = _gen_config(
         hyde={"enabled": True},
         reflection={"enabled": False, "max_iterations": 2},
     )
     llm = MagicMock()
-
-    def chat_structured_side_effect(messages, schema):
-        if schema == QueryAnalysis:
-            return StructuredResponse(
-                parsed=QueryAnalysis(query_type="single", tasks=[]),
-                usage=_usage(),
-            )
-        raise ValueError(f"Unexpected schema: {schema}")
-
-    llm.chat_structured.side_effect = chat_structured_side_effect
-    llm.chat.return_value = LLMResponse(content="Hypothetical passage.", usage=_usage())
+    llm.chat_structured.return_value = StructuredResponse(
+        parsed=QueryAnalysis(query_type="single", tasks=[]),
+        usage=_usage(),
+    )
 
     graph = _build_graph(llm, _make_retriever(), _make_embedder(), config)
     final = graph.invoke(make_initial_state("What was NVDA's revenue?"))
 
-    assert final["answer"] is None
+    assert isinstance(final["answer"], GenerationResult)
+    assert "trouble understanding" in final["answer"].answer
+    llm.chat.assert_not_called()  # HyDE never ran
+
+
+# ---------------------------------------------------------------------------
+# Ticker not indexed — short-circuits in analyze with canned answer
+# ---------------------------------------------------------------------------
+
+def test_unknown_ticker_returns_canned_answer():
+    """analyze (ticker not in DB) → END with canned answer, no HyDE, no retrieval"""
+    config = _gen_config(
+        hyde={"enabled": True},
+        reflection={"enabled": False, "max_iterations": 2},
+    )
+    llm = MagicMock()
+    llm.chat_structured.return_value = StructuredResponse(
+        parsed=QueryAnalysis(
+            query_type="single",
+            tasks=[RetrievalTask(query="FAKE revenue", filter=MetadataFilter(ticker="FAKE"))],
+        ),
+        usage=_usage(),
+    )
+
+    graph = _build_graph(
+        llm, _make_retriever(), _make_embedder(), config,
+        filings_repo=_make_filings_repo(tickers_in_db=[]),
+    )
+    final = graph.invoke(make_initial_state("What was FAKE's revenue?"))
+
+    assert isinstance(final["answer"], GenerationResult)
+    assert "FAKE" in final["answer"].answer
+    assert "don't have filings" in final["answer"].answer
+    llm.chat.assert_not_called()  # HyDE never ran
 
 
 # ---------------------------------------------------------------------------

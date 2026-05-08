@@ -1,5 +1,6 @@
 from config.loader import AppConfig
 from db.client.base import DatabaseClient
+from db.factory import create_filings_repo
 from etl.embedder.base import Embedder
 from generation.graph import build_graph
 from generation.nodes import (
@@ -31,11 +32,12 @@ def build_generation_pipeline(config: AppConfig, db_client: DatabaseClient, embe
         the updated state with an answer field populated.
     """
     llm = build_llm(config.llm)
+    filings_repo = create_filings_repo(db_client)
     retriever = build_retriever_from_config(config, db_client)
     prompts = load_prompts(tag=config.prompts.tag)
 
     return build_graph(
-        analyze_query_fn=make_analyze_query(llm, prompts.query_analysis),
+        analyze_query_fn=make_analyze_query(llm, prompts.query_analysis, filings_repo),
         hyde_expand_fn=make_hyde_expand(llm, prompts.hyde),
         retrieve_fn=make_retrieve(retriever, embedder),
         generate_fn=make_generate(llm, prompts.qa, prompts.comparison, prompts.time_series),

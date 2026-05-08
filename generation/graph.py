@@ -34,18 +34,12 @@ def build_graph(
     def route_after_analyze(state: GenerationState):
         if config.eval_stop_after == "analyze_query":
             return END
-        if state["query_type"] == "out_of_scope":
-            logger.debug("Query is out of scope — terminating early.")
+        tasks = state["pending_tasks"]
+        if not tasks:
+            logger.debug("analyze_query produced no tasks — terminating early.")
             return END
         if config.hyde.enabled:
             return "hyde_expand"
-        tasks = state["pending_tasks"]
-        if not tasks:
-            logger.warning(
-                "Query type '%s' produced no retrieval tasks — terminating without answer.",
-                state["query_type"],
-            )
-            return END
         return [Send("retrieve", {"task": t, "hyde_query": None}) for t in tasks]
 
     def route_after_hyde(state: GenerationState):

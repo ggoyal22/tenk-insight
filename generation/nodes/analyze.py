@@ -1,16 +1,16 @@
 import logging
 from collections.abc import Callable
 
+from db.repositories.filings import FilingsRepo
 from generation.nodes._stream import get_writer
-
+from generation.types import GenerationResult, GenerationState, QueryAnalysis
 from llm.base import BaseLLM
 from llm.types import Message
-from generation.types import GenerationState, QueryAnalysis
 
 logger = logging.getLogger(__name__)
 
 
-def make_analyze_query(llm: BaseLLM, prompt: str) -> Callable[[GenerationState], dict]:
+def make_analyze_query(llm: BaseLLM, prompt: str, filings_repo: FilingsRepo) -> Callable[[GenerationState], dict]:
     def analyze_query(state: GenerationState) -> dict:
         write = get_writer()
         write("Analyzing your question...")
@@ -28,12 +28,40 @@ def make_analyze_query(llm: BaseLLM, prompt: str) -> Callable[[GenerationState],
             analysis.query_type, len(analysis.tasks),
         )
 
-        return {
+        base = {
             "query_type": analysis.query_type,
             "pending_tasks": analysis.tasks,
             "retrieval_triggered_by": "analysis",
             "pipeline_usage": [response.usage],
         }
+
+        if analysis.query_type == "out_of_scope":
+            return {**base, "pending_tasks": [], "answer": GenerationResult(
+                answer="This question can't be answered from SEC 10-K filings.",
+                citations=[],
+            )}
+
+        if not analysis.tasks:
+            return {**base, "answer": GenerationResult(
+                answer="I had trouble understanding your question. Try rephrasing it.",
+                citations=[],
+            )}
+
+        tickers = [
+            t.filter.ticker.upper()
+            for t in analysis.tasks
+            if t.filter and t.filter.ticker
+        ]
+        if tickers:
+            missing = [t for t in tickers if not filings_repo.list_ids({"ticker": t})]
+            if len(missing) == len(tickers):
+                ticker_list = ", ".join(missing)
+                return {**base, "pending_tasks": [], "answer": GenerationResult(
+                    answer=f"I don't have filings indexed for {ticker_list}.",
+                    citations=[],
+                )}
+
+        return base
 
     return analyze_query
 
