@@ -37,9 +37,9 @@ def _retrieve_attrs(chunks: list[str], use_parent: bool = True) -> str:
     })
 
 
-def _make_rows(*spans: tuple[str, str]) -> list[tuple[str, str]]:
-    """Each span is (name, attrs_json)."""
-    return list(spans)
+def _make_rows(*spans: tuple[str, str]) -> list[tuple[int, str, str]]:
+    """Each span is (name, attrs_json); returns (span_id, name, attrs_json) with auto IDs."""
+    return [(i + 1, name, attrs) for i, (name, attrs) in enumerate(spans)]
 
 
 # ---------------------------------------------------------------------------

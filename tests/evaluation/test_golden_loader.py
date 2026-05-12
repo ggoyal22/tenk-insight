@@ -128,11 +128,11 @@ def test_load_golden_raises_on_missing_query_field(tmp_path):
         load_golden(str(f))
 
 
-def test_load_golden_raises_on_missing_answer_field(tmp_path):
-    f = tmp_path / "bad.yaml"
+def test_load_golden_skips_entry_with_no_answer_field(tmp_path):
+    f = tmp_path / "golden.yaml"
     _write_yaml(f, [{"query": "Q", "query_type": "single"}])
-    with pytest.raises(ValueError, match="missing required field"):
-        load_golden(str(f))
+    result = load_golden(str(f))
+    assert result == {}
 
 
 def test_load_golden_raises_on_missing_query_type_field(tmp_path):

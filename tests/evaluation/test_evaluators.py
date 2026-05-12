@@ -81,24 +81,25 @@ def test_empty_samples_returns_empty_evaluation_result():
 
 def _patch_ragas(mock_scores: dict):
     """Context manager that stubs out RAGAS internals for unit tests."""
-    import pandas as pd
-    mock_metric = MagicMock()
-    mock_registry = {k: MagicMock(return_value=mock_metric) for k in _METRIC_REGISTRY}
-    mock_result = MagicMock()
-    mock_result.to_pandas.return_value = pd.DataFrame(mock_scores)
+    def make_metric_class(name):
+        instance = MagicMock()
+        instance.batch_score.return_value = [
+            MagicMock(value=s) for s in mock_scores.get(name, [])
+        ]
+        return MagicMock(return_value=instance)
+
+    mock_registry = {k: make_metric_class(k) for k in _METRIC_REGISTRY}
     return (
         patch("evaluation.evaluators.ragas._METRIC_REGISTRY", mock_registry),
-        patch("evaluation.evaluators.ragas.evaluate", return_value=mock_result),
-        patch("evaluation.evaluators.ragas.EvaluationDataset"),
         patch("evaluation.evaluators.ragas.llm_factory"),
-        patch("evaluation.evaluators.ragas.OpenAI"),
+        patch("evaluation.evaluators.ragas.AsyncOpenAI"),
     )
 
 
 def test_context_recall_dropped_when_no_references():
     evaluator = RagasEvaluator(_make_config())
     patches = _patch_ragas({"faithfulness": [0.9]})
-    with patches[0], patches[1], patches[2], patches[3], patches[4]:
+    with patches[0], patches[1], patches[2]:
         result = evaluator.evaluate(
             [_sample(reference=None)],
             metrics=["faithfulness", "context_recall"],
@@ -112,7 +113,7 @@ def test_context_recall_dropped_when_no_references():
 def test_context_recall_included_when_reference_present():
     evaluator = RagasEvaluator(_make_config())
     patches = _patch_ragas({"faithfulness": [0.9], "context_recall": [0.8]})
-    with patches[0], patches[1], patches[2], patches[3], patches[4]:
+    with patches[0], patches[1], patches[2]:
         result = evaluator.evaluate(
             [_sample(reference="Expected answer")],
             metrics=["faithfulness", "context_recall"],
@@ -136,7 +137,7 @@ def test_all_metrics_dropped_returns_empty_scores():
 def test_scores_and_aggregate_are_consistent():
     evaluator = RagasEvaluator(_make_config())
     patches = _patch_ragas({"faithfulness": [0.8, 0.6]})
-    with patches[0], patches[1], patches[2], patches[3], patches[4]:
+    with patches[0], patches[1], patches[2]:
         result = evaluator.evaluate(
             [_sample(), _sample()],
             metrics=["faithfulness"],
@@ -150,7 +151,7 @@ def test_scores_and_aggregate_are_consistent():
 def test_nan_scores_are_filtered_from_per_sample_and_aggregate():
     evaluator = RagasEvaluator(_make_config())
     patches = _patch_ragas({"faithfulness": [float("nan")]})
-    with patches[0], patches[1], patches[2], patches[3], patches[4]:
+    with patches[0], patches[1], patches[2]:
         result = evaluator.evaluate([_sample()], metrics=["faithfulness"])
     assert "faithfulness" not in result.scores[0]
     assert "faithfulness" not in result.aggregate
@@ -172,7 +173,7 @@ def test_build_llm_passes_api_key():
     from pydantic import SecretStr
     cfg = _make_config(api_key=SecretStr("sk-test"))
     evaluator = RagasEvaluator(cfg)
-    with patch("evaluation.evaluators.ragas.OpenAI") as mock_openai, \
+    with patch("evaluation.evaluators.ragas.AsyncOpenAI") as mock_openai, \
          patch("evaluation.evaluators.ragas.llm_factory"):
         evaluator._build_llm()
         mock_openai.assert_called_once_with(api_key="sk-test")

@@ -181,7 +181,7 @@ def test_runner_extractor_uses_config_datasets():
     evaluator = MagicMock()
     runner = EvaluationRunner(extractor, evaluator, [], golden={})
     runner.run(_eval_config(datasets=["single"]))
-    extractor.extract.assert_called_once_with(["single"])
+    extractor.extract.assert_called_once_with(["single"], since=None)
 
 
 def test_runner_run_id_is_iso8601_timestamp():

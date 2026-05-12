@@ -22,7 +22,7 @@ def _run_result(**kwargs) -> RunResult:
     return RunResult(**{**defaults, **kwargs})
 
 
-def _sample(trace_id: str = "span-001") -> EvalSample:
+def _sample(trace_id: int = 1) -> EvalSample:
     return EvalSample(
         trace_id=trace_id,
         query_type="single",
@@ -94,13 +94,27 @@ def test_jsonl_creates_nested_results_dir(tmp_path):
 
 def _make_db(tmp_path) -> str:
     db_path = str(tmp_path / "phoenix.db")
+    with sqlite3.connect(db_path) as conn:
+        conn.execute("""
+            CREATE TABLE span_annotations (
+                id             INTEGER PRIMARY KEY,
+                span_rowid     INTEGER NOT NULL,
+                name           TEXT NOT NULL,
+                score          REAL,
+                annotator_kind TEXT NOT NULL,
+                source         TEXT NOT NULL,
+                metadata       TEXT NOT NULL,
+                identifier     TEXT NOT NULL DEFAULT '',
+                UNIQUE (name, span_rowid, identifier)
+            )
+        """)
     return db_path
 
 
 def test_phoenix_writes_annotation_rows(tmp_path):
     db_path = _make_db(tmp_path)
     exporter = PhoenixTraceAnnotationExporter(db_path)
-    samples = [_sample("span-1"), _sample("span-2")]
+    samples = [_sample(1), _sample(2)]
     evaluation = _evaluation([
         {"faithfulness": 0.9},
         {"faithfulness": 0.7},
@@ -108,16 +122,16 @@ def test_phoenix_writes_annotation_rows(tmp_path):
     exporter.export(_run_result(), samples, evaluation)
 
     with sqlite3.connect(db_path) as conn:
-        rows = conn.execute("SELECT span_id, name, score FROM span_annotations ORDER BY span_id").fetchall()
+        rows = conn.execute("SELECT span_rowid, name, score FROM span_annotations ORDER BY span_rowid").fetchall()
     assert len(rows) == 2
-    assert rows[0] == ("span-1", "faithfulness", pytest.approx(0.9))
-    assert rows[1] == ("span-2", "faithfulness", pytest.approx(0.7))
+    assert rows[0] == (1, "faithfulness", pytest.approx(0.9))
+    assert rows[1] == (2, "faithfulness", pytest.approx(0.7))
 
 
 def test_phoenix_writes_multiple_metrics(tmp_path):
     db_path = _make_db(tmp_path)
     exporter = PhoenixTraceAnnotationExporter(db_path)
-    samples = [_sample("span-1")]
+    samples = [_sample(1)]
     evaluation = _evaluation([{"faithfulness": 0.9, "answer_relevancy": 0.8}])
     exporter.export(_run_result(), samples, evaluation)
 
@@ -127,7 +141,7 @@ def test_phoenix_writes_multiple_metrics(tmp_path):
 
 
 def test_phoenix_skips_export_when_no_scores(tmp_path):
-    db_path = _make_db(tmp_path)
+    db_path = str(tmp_path / "phoenix.db")  # bare DB — exporter must not create any tables
     exporter = PhoenixTraceAnnotationExporter(db_path)
     exporter.export(_run_result(), [], EvaluationResult(scores=[], aggregate={}))
 
@@ -141,7 +155,7 @@ def test_phoenix_skips_export_when_no_scores(tmp_path):
 def test_phoenix_upserts_on_duplicate(tmp_path):
     db_path = _make_db(tmp_path)
     exporter = PhoenixTraceAnnotationExporter(db_path)
-    samples = [_sample("span-1")]
+    samples = [_sample(1)]
     run = _run_result(run_id="run-1")
 
     exporter.export(run, samples, _evaluation([{"faithfulness": 0.7}]))
@@ -157,7 +171,7 @@ def test_phoenix_stores_run_metadata(tmp_path):
     db_path = _make_db(tmp_path)
     exporter = PhoenixTraceAnnotationExporter(db_path)
     result = _run_result(run_id="run-abc", git_sha="deadbeef", golden_used=True)
-    exporter.export(result, [_sample("s1")], _evaluation([{"faithfulness": 0.8}]))
+    exporter.export(result, [_sample(1)], _evaluation([{"faithfulness": 0.8}]))
 
     with sqlite3.connect(db_path) as conn:
         row = conn.execute(
@@ -173,18 +187,18 @@ def test_phoenix_stores_run_metadata(tmp_path):
 def test_phoenix_run_id_links_annotations_to_run(tmp_path):
     db_path = _make_db(tmp_path)
     exporter = PhoenixTraceAnnotationExporter(db_path)
-    exporter.export(_run_result(run_id="run-abc"), [_sample("s1")], _evaluation([{"faithfulness": 0.8}]))
+    exporter.export(_run_result(run_id="run-abc"), [_sample(1)], _evaluation([{"faithfulness": 0.8}]))
 
     with sqlite3.connect(db_path) as conn:
-        run_id = conn.execute("SELECT run_id FROM span_annotations").fetchone()[0]
+        run_id = conn.execute("SELECT identifier FROM span_annotations").fetchone()[0]
     assert run_id == "run-abc"
 
 
 def test_phoenix_writes_one_evaluation_run_row_per_run(tmp_path):
     db_path = _make_db(tmp_path)
     exporter = PhoenixTraceAnnotationExporter(db_path)
-    exporter.export(_run_result(run_id="run-1"), [_sample("s1")], _evaluation([{"faithfulness": 0.8}]))
-    exporter.export(_run_result(run_id="run-2"), [_sample("s2")], _evaluation([{"faithfulness": 0.9}]))
+    exporter.export(_run_result(run_id="run-1"), [_sample(1)], _evaluation([{"faithfulness": 0.8}]))
+    exporter.export(_run_result(run_id="run-2"), [_sample(2)], _evaluation([{"faithfulness": 0.9}]))
 
     with sqlite3.connect(db_path) as conn:
         count = conn.execute("SELECT COUNT(*) FROM evaluation_runs").fetchone()[0]
