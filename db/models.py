@@ -33,6 +33,16 @@ class ParentChunkRecord:
 
 
 @dataclass
+class FeedbackRecord:
+    id: UUID
+    query: str
+    answer: str
+    rating: bool
+    comment: str | None
+    created_at: datetime
+
+
+@dataclass
 class ChunkRecord:
     id: UUID
     filing_id: UUID

@@ -2,9 +2,11 @@ from config.loader import AppConfig
 from db.client.base import DatabaseClient
 from db.client.postgres import PostgresClient
 from db.repositories.chunks import ChunksRepo
+from db.repositories.feedback import FeedbackRepo
 from db.repositories.filings import FilingsRepo
 from db.repositories.parent_chunks import ParentChunksRepo
 from db.repositories.postgres.chunks import PostgresChunksRepository
+from db.repositories.postgres.feedback import PostgresFeedbackRepo
 from db.repositories.postgres.filings import PostgresFilingsRepository
 from db.repositories.postgres.parent_chunks import PostgresParentChunksRepository
 from db.vector.base import VectorStore
@@ -42,3 +44,7 @@ def create_parent_chunks_repo(client: DatabaseClient) -> ParentChunksRepo:
 
 def create_chunks_repo(client: DatabaseClient) -> ChunksRepo:
     return PostgresChunksRepository(client)
+
+
+def create_feedback_repo(client: DatabaseClient) -> FeedbackRepo:
+    return PostgresFeedbackRepo(client)

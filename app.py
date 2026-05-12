@@ -16,7 +16,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import streamlit as st
 
 from config.loader import load_config
-from db.factory import create_db_client, create_filings_repo
+from db.factory import create_db_client, create_feedback_repo, create_filings_repo
+from db.repositories.feedback import FeedbackRepo
 from etl.factory import create_embedder
 from generation.factory import build_generation_pipeline, make_initial_state
 from generation.types import Citation, GenerationResult, total_pipeline_usage
@@ -59,7 +60,9 @@ def load_pipeline():
     embedder = create_embedder(config)
     graph = build_generation_pipeline(config, client, embedder)
     indexed = create_filings_repo(client).list_indexed_summary()
-    return config, client, graph, indexed
+    feedback_repo = create_feedback_repo(client)
+    feedback_repo.create_table()
+    return config, client, graph, indexed, feedback_repo
 
 
 def render_citations(citations: list[dict]) -> None:
@@ -80,7 +83,32 @@ def render_citations(citations: list[dict]) -> None:
             st.text(c["chunk_text"])
 
 
-def submit_query(query: str, graph) -> None:
+def render_feedback(msg_index: int, query: str, answer: str, repo: FeedbackRepo) -> None:
+    submitted_key = f"fb_submitted_{msg_index}"
+
+    if st.session_state.get(submitted_key):
+        return
+
+    st.caption("Rate this answer")
+    rating = st.feedback("thumbs", key=f"fb_{msg_index}")
+
+    if rating is not None:
+        comment = st.text_area(
+            "comment", key=f"fb_comment_{msg_index}", height=68,
+            label_visibility="collapsed", placeholder="Add a comment (optional)",
+        )
+        if st.button("Submit", key=f"fb_submit_{msg_index}", type="tertiary"):
+            repo.insert_feedback(
+                query=query,
+                answer=answer,
+                rating=bool(rating),
+                comment=comment.strip() or None,
+            )
+            st.session_state[submitted_key] = True
+            st.rerun()
+
+
+def submit_query(query: str, graph, feedback_repo: FeedbackRepo) -> None:
     st.session_state.messages.append({"role": "user", "content": query})
     with st.chat_message("user"):
         st.markdown(query)
@@ -126,11 +154,14 @@ def submit_query(query: str, graph) -> None:
             "role": "assistant",
             "content": result.answer,
             "citations": citations,
+            "query": query,
             "usage": {
                 "input_tokens": usage.input_tokens,
                 "output_tokens": usage.output_tokens,
             },
         })
+        msg_index = len(st.session_state.messages) - 1
+        render_feedback(msg_index, query, result.answer, feedback_repo)
         st.session_state.history.append(Message(role="user", content=query))
         st.session_state.history.append(Message(role="assistant", content=result.answer))
 
@@ -144,7 +175,7 @@ def main() -> None:
     )
 
     try:
-        config, _db_client, graph, indexed = load_pipeline()
+        config, _db_client, graph, indexed, feedback_repo = load_pipeline()
     except Exception:
         logger.exception("Failed to initialize pipeline")
         st.error("Failed to initialize the pipeline. Check server logs for details.")
@@ -167,9 +198,11 @@ def main() -> None:
         if st.button("New chat", use_container_width=True):
             st.session_state.messages = []
             st.session_state.history = []
+            for key in [k for k in st.session_state if k.startswith("fb_")]:
+                del st.session_state[key]
             st.rerun()
 
-    for msg in st.session_state.messages:
+    for i, msg in enumerate(st.session_state.messages):
         with st.chat_message(msg["role"]):
             st.markdown(msg["content"])
             if msg.get("citations"):
@@ -177,6 +210,8 @@ def main() -> None:
             if msg.get("usage"):
                 u = msg["usage"]
                 st.caption(f"{u['input_tokens']} in / {u['output_tokens']} out tokens")
+            if msg["role"] == "assistant" and msg.get("query"):
+                render_feedback(i, msg["query"], msg["content"], feedback_repo)
 
     if not st.session_state.messages:
         st.markdown("#### Try asking:")
@@ -186,11 +221,11 @@ def main() -> None:
             if cols[i % 2].button(q, key=f"sug_{i}", use_container_width=True):
                 clicked = q
         if clicked:
-            submit_query(clicked, graph)
+            submit_query(clicked, graph, feedback_repo)
             st.rerun()
 
     if prompt := st.chat_input("Ask a question about SEC filings..."):
-        submit_query(prompt, graph)
+        submit_query(prompt, graph, feedback_repo)
 
 
 if __name__ == "__main__":
