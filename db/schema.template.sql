@@ -43,6 +43,7 @@ CREATE TABLE IF NOT EXISTS filings (
     form_type        VARCHAR     NOT NULL,                                                          -- e.g. "10-K", "10-Q", "8-K"
     filing_date      DATE        NOT NULL,                                                          -- date the filing was submitted to SEC
     fiscal_year_end  DATE,                                                                          -- end of the fiscal year covered by this filing
+    fiscal_year      INT,                                                                           -- fiscal year label (e.g. 2024); set from the year param at ingest; best-effort for pre-existing rows
     sic_code         VARCHAR,                                                                       -- Standard Industrial Classification code
     source_url       TEXT        NOT NULL,                                                          -- full EDGAR URL to the filing document
     downloaded_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),                                            -- when raw filing was fetched from EDGAR
@@ -54,6 +55,7 @@ CREATE INDEX IF NOT EXISTS idx_filings_cik             ON filings (cik);
 CREATE INDEX IF NOT EXISTS idx_filings_form_type       ON filings (form_type);
 CREATE INDEX IF NOT EXISTS idx_filings_filing_date     ON filings (filing_date);
 CREATE INDEX IF NOT EXISTS idx_filings_fiscal_year_end ON filings (fiscal_year_end);
+CREATE INDEX IF NOT EXISTS idx_filings_fiscal_year     ON filings (fiscal_year);
 
 CREATE OR REPLACE TRIGGER filings_set_updated_at
     BEFORE UPDATE ON filings

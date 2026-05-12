@@ -213,12 +213,11 @@ def _serialise_tasks(tasks: list) -> list[dict]:
 def _build_filter(d: dict | None) -> MetadataFilter | None:
     if not d:
         return None
-    from datetime import date
-    fy = d.get("fiscal_year_end")
+    fy = d.get("fiscal_year")
     return MetadataFilter(
         ticker=d.get("ticker"),
         form_type=d.get("form_type"),
-        fiscal_year_end=date.fromisoformat(fy) if isinstance(fy, str) else fy,
+        fiscal_year=int(fy) if fy is not None else None,
         section=d.get("section"),
     )
 

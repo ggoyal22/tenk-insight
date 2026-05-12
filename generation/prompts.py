@@ -31,13 +31,13 @@ For each task:
 - `query`: semantic search string using financial statement language, not the verbatim question (e.g. "total revenues net sales fiscal year", "cost of revenue cost of goods sold", "operating income loss before taxes")
 - `filter.ticker`: company ticker symbol
 - `filter.form_type`: always "10-K" unless explicitly requested otherwise
-- `filter.fiscal_year_end`: set ONLY for exact dates; leave null for year references like "2024" — companies have non-calendar fiscal years and exact dates will miss them
+- `filter.fiscal_year`: 4-digit integer (e.g. 2024); set when the query references a specific fiscal year — this is the year label the company uses, not derived from the end date
 - `filter.section`: "Item 7" for financial metrics (revenue, profit, margins, earnings, cash flow, debt); "Item 1A" for risk factors; "Item 1" for business description and segments; null for all other topics
 
 Task count rules:
 - out_of_scope: zero tasks
 - single: one task per required data input (most single queries need one task; calculation questions may need two if inputs could be in different sections)
-- comparison: one task per company or fiscal period being compared; use the same `query` text across all tasks — vary only `filter.ticker` and `filter.fiscal_year_end`
+- comparison: one task per company or fiscal period being compared; use the same `query` text across all tasks — vary only `filter.ticker` and `filter.fiscal_year`
 
 Return only the JSON. Do not add explanations outside the JSON."""
 
@@ -90,7 +90,7 @@ Return done: false with a next_task only if specific, identifiable information i
 
 When providing next_task:
 - query: a precise search query targeting only the missing information — use financial statement language
-- filter: narrow as specifically as possible (ticker, fiscal_year_end); do not set section
+- filter: narrow as specifically as possible (ticker, fiscal_year); do not set section
 
 Default to done: true. Only request further retrieval if the gap is concrete and the missing information is likely to exist in a 10-K filing."""
 
@@ -109,6 +109,6 @@ Return quality: "low" if either fails, along with:
 - reason: a concise explanation of what is wrong
 - next_task: a retrieval task that would obtain the missing or unverified information
   - query: target the specific gap
-  - filter: narrow as specifically as possible (ticker, fiscal_year_end) — do not set section
+  - filter: narrow as specifically as possible (ticker, fiscal_year) — do not set section
 
 Be strict but fair. Minor omissions are acceptable if the core question is answered and every stated fact is grounded in the context."""

@@ -89,8 +89,8 @@ class Retriever:
             filing_filters["ticker"] = filters.ticker.upper()
         if filters.form_type:
             filing_filters["form_type"] = filters.form_type
-        if filters.fiscal_year_end:
-            filing_filters["fiscal_year_end"] = filters.fiscal_year_end
+        if filters.fiscal_year:
+            filing_filters["fiscal_year"] = filters.fiscal_year
 
         if not filing_filters:
             return None

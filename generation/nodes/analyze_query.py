@@ -87,8 +87,8 @@ def _build_user_message(state: GenerationState) -> str:
             filter_parts.append(f"ticker={query_filter.ticker}")
         if query_filter.form_type:
             filter_parts.append(f"form_type={query_filter.form_type}")
-        if query_filter.fiscal_year_end:
-            filter_parts.append(f"fiscal_year_end={query_filter.fiscal_year_end}")
+        if query_filter.fiscal_year:
+            filter_parts.append(f"fiscal_year={query_filter.fiscal_year}")
         if filter_parts:
             parts.append(f"Pre-applied filter: {', '.join(filter_parts)}")
 

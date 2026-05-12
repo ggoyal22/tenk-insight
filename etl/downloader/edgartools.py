@@ -73,6 +73,7 @@ class EdgarToolsDownloader(Downloader):
             form_type=form_type,
             filing_date=filing.filing_date,
             fiscal_year_end=_parse_period(filing.period_of_report, ticker, year),
+            fiscal_year=year,
             sic_code=str(company.sic) if company.sic else None,
             source_url=filing.filing_url,
             downloaded_at=datetime.now(timezone.utc),

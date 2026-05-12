@@ -24,7 +24,7 @@ class PostgresFilingsRepository(FilingsRepo, PostgresRepository[FilingRecord]):
 
     @property
     def _updatable_columns(self) -> set[str]:
-        return {"fiscal_year_end", "sic_code"}
+        return {"fiscal_year_end", "fiscal_year", "sic_code"}
 
     # ── Filings-specific queries ──────────────────────────────────────────────
 
@@ -48,8 +48,8 @@ class PostgresFilingsRepository(FilingsRepo, PostgresRepository[FilingRecord]):
                 ticker,
                 company_name,
                 array_agg(
-                    DISTINCT EXTRACT(YEAR FROM fiscal_year_end)::int
-                    ORDER BY EXTRACT(YEAR FROM fiscal_year_end)::int DESC
+                    DISTINCT fiscal_year
+                    ORDER BY fiscal_year DESC
                 )
             FROM filings
             GROUP BY ticker, company_name

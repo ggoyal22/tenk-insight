@@ -15,6 +15,7 @@ class FilingRecord:
     source_url: str
     downloaded_at: datetime
     fiscal_year_end: date | None = None
+    fiscal_year: int | None = None
     sic_code: str | None = None
     updated_at: datetime | None = None
 

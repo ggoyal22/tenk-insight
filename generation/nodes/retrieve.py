@@ -25,8 +25,8 @@ def make_retrieve(retriever: Retriever, embedder: Embedder) -> Callable[[Retriev
         query_snippet = task.query[:50]
         if f and (f.ticker or f.form_type):
             parts = [p for p in [f.ticker, f.form_type] if p]
-            if f.fiscal_year_end:
-                parts.append(f"({f.fiscal_year_end.year})")
+            if f.fiscal_year:
+                parts.append(f"({f.fiscal_year})")
             write(f"Searching {' '.join(parts)} · {query_snippet}...")
         else:
             write(f"Searching: {query_snippet}...")
