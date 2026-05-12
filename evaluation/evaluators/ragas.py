@@ -46,6 +46,7 @@ _METRIC_KWARGS: dict[str, list[str]] = {
 }
 
 _REFERENCE_REQUIRED: frozenset[str] = frozenset({"context_recall"})
+_CONTEXTS_REQUIRED: frozenset[str] = frozenset({"faithfulness", "context_precision", "context_recall"})
 
 
 class RagasEvaluator(BaseEvaluator):
@@ -89,9 +90,28 @@ class RagasEvaluator(BaseEvaluator):
                 if name == "answer_relevancy"
                 else _METRIC_REGISTRY[name](llm=llm)
             )
-            inputs = [_sample_to_kwargs(s, _METRIC_KWARGS[name]) for s in samples]
+
+            if name in _CONTEXTS_REQUIRED:
+                # RAGAS raises ValueError on empty lists — score those 0.0 directly
+                scorable = [(i, s) for i, s in enumerate(samples) if s.retrieved_contexts]
+                empty_count = len(samples) - len(scorable)
+                if empty_count:
+                    logger.warning(
+                        "Metric '%s': %d sample(s) have no retrieved contexts — scored 0.0",
+                        name, empty_count,
+                    )
+                for i, s in enumerate(samples):
+                    if not s.retrieved_contexts:
+                        per_sample[i][name] = 0.0
+            else:
+                scorable = list(enumerate(samples))
+
+            if not scorable:
+                continue
+
+            inputs = [_sample_to_kwargs(s, _METRIC_KWARGS[name]) for _, s in scorable]
             results = metric.batch_score(inputs)
-            for i, res in enumerate(results):
+            for (i, _), res in zip(scorable, results):
                 try:
                     v = float(res.value)
                     if not math.isnan(v):
