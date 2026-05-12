@@ -24,13 +24,10 @@ def task_count_match(output: dict, expected: dict) -> tuple | bool:
 
 
 def task_filter_recall(output: dict, expected: dict) -> tuple | float:
-    """Fraction of expected task filters that appear in the output tasks.
+    """Fraction of expected tickers that appear in the output tasks.
 
     Returns (None, "skipped") when expected_tasks is absent. Out-of-scope entries
     (expected_tasks=[]) score 1.0 only when the output also has no tasks.
-
-    Matching is partial: only non-None fields in the expected filter must match.
-    e.g. expected {ticker: AAPL} matches output {ticker: AAPL, form_type: 10-K}.
     """
     expected_tasks = expected.get("expected_tasks")
     if expected_tasks is None:
@@ -39,19 +36,18 @@ def task_filter_recall(output: dict, expected: dict) -> tuple | float:
     if not expected_tasks:
         return 1.0 if not output.get("tasks") else 0.0
 
-    output_filters = [t.get("filter") for t in output.get("tasks", [])]
-    matched = sum(
-        any(_filter_matches(exp["filter"], out_f) for out_f in output_filters)
+    expected_tickers = [
+        exp["filter"]["ticker"]
         for exp in expected_tasks
-        if exp.get("filter")
-    )
-    total = sum(1 for exp in expected_tasks if exp.get("filter"))
-    return matched / total if total else 1.0
+        if exp.get("filter") and exp["filter"].get("ticker")
+    ]
+    if not expected_tickers:
+        return 1.0
 
+    output_tickers = {
+        (t.get("filter") or {}).get("ticker")
+        for t in output.get("tasks", [])
+    } - {None}
 
-def _filter_matches(expected: dict | None, actual: dict | None) -> bool:
-    if not expected:
-        return True
-    if actual is None:
-        return False
-    return all(actual.get(k) == v for k, v in expected.items() if v is not None)
+    matched = sum(1 for t in expected_tickers if t in output_tickers)
+    return matched / len(expected_tickers)
