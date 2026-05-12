@@ -17,11 +17,10 @@ def make_generate(
     llm: BaseLLM,
     qa_prompt: str,
     comparison_prompt: str,
-    time_series_prompt: str,
 ) -> Callable[[GenerationState], dict]:
     def generate(state: GenerationState) -> dict:
         get_writer()("Generating answer...")
-        prompt = _select_prompt(state["query_type"], qa_prompt, comparison_prompt, time_series_prompt)
+        prompt = _select_prompt(state["query_type"], qa_prompt, comparison_prompt)
         results = _deduplicate(state["completed_results"])
 
         if not results:
@@ -57,12 +56,10 @@ def make_generate(
     return generate
 
 
-def _select_prompt(query_type: str, qa: str, comparison: str, time_series: str) -> str:
+def _select_prompt(query_type: str, qa: str, comparison: str) -> str:
     if query_type == "comparison":
         return comparison
-    if query_type == "time_series":
-        return time_series
-    return qa  # single, multi_hop
+    return qa  # single
 
 
 def _deduplicate(completed_results: list[list[RetrievalResult]]) -> list[RetrievalResult]:

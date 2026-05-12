@@ -22,7 +22,7 @@ def make_check_hop(llm: BaseLLM, config: GenerationConfig, prompt: str) -> Calla
                 role="user",
                 content=(
                     f"Question: {state.get('resolved_query') or state['query']}\n\n"
-                    f"Context retrieved so far (hop {state['hop_count'] + 1} of {config.multi_hop.max_hops}):\n"
+                    f"Context retrieved so far (hop {state['hop_count'] + 1} of {config.hop.max_hops}):\n"
                     f"{context}"
                 ),
             ),

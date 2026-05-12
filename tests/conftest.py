@@ -82,8 +82,8 @@ VALID_LLM = {
 
 VALID_GENERATION = {
     "hyde": {"enabled": True},
+    "hop": {"enabled": False, "max_hops": 3},
     "reflection": {"enabled": True, "max_iterations": 2},
-    "multi_hop": {"max_hops": 3},
 }
 
 VALID_LOGGING = {

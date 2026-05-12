@@ -15,10 +15,9 @@ from generation.types import (
     GenerationResult,
     GenerationState,
     HopDecision,
-    QueryClassification,
+    QueryPlan,
     ReflectionDecision,
     RetrievalTask,
-    TaskPlan,
 )
 from llm.types import LLMUsage
 from retrieval.types import MetadataFilter
@@ -40,62 +39,89 @@ def test_retrieval_task_filter_defaults_to_none():
     assert task.filter is None
 
 
+def test_retrieval_task_hyde_query_defaults_to_none():
+    task = RetrievalTask(query="some query")
+    assert task.hyde_query is None
+
+
+def test_retrieval_task_accepts_hyde_query():
+    task = RetrievalTask(query="some query", hyde_query="Hypothetical passage.")
+    assert task.hyde_query == "Hypothetical passage."
+
+
 def test_retrieval_task_has_json_schema():
     schema = RetrievalTask.model_json_schema()
     assert "query" in schema["properties"]
 
 
 # ---------------------------------------------------------------------------
-# QueryClassification
+# QueryPlan
 # ---------------------------------------------------------------------------
 
-def test_query_classification_valid():
-    qc = QueryClassification(query_type="single", resolved_query="What was NVDA's revenue in 2024?")
-    assert qc.query_type == "single"
-    assert qc.resolved_query == "What was NVDA's revenue in 2024?"
-
-
-def test_query_classification_rejects_invalid_query_type():
-    with pytest.raises(ValidationError):
-        QueryClassification(query_type="unknown", resolved_query="query")
-
-
-@pytest.mark.parametrize("qt", ["single", "comparison", "time_series", "multi_hop", "out_of_scope"])
-def test_query_classification_accepts_all_valid_types(qt):
-    qc = QueryClassification(query_type=qt, resolved_query="query")
-    assert qc.query_type == qt
-
-
-def test_query_classification_has_json_schema():
-    schema = QueryClassification.model_json_schema()
-    assert "query_type" in schema["properties"]
-    assert "resolved_query" in schema["properties"]
-
-
-def test_query_classification_resolved_query_has_description_in_schema():
-    schema = QueryClassification.model_json_schema()
-    assert "description" in schema["properties"]["resolved_query"]
-
-
-# ---------------------------------------------------------------------------
-# TaskPlan
-# ---------------------------------------------------------------------------
-
-def test_task_plan_holds_tasks():
-    task = RetrievalTask(query="NVDA revenue 2024", filter=MetadataFilter(ticker="NVDA"))
-    plan = TaskPlan(tasks=[task])
+def test_query_plan_single():
+    task = RetrievalTask(query="NVDA revenue 2024")
+    plan = QueryPlan(
+        reasoning="Single company metric lookup.",
+        query_type="single",
+        resolved_query="What was NVDA's revenue in FY2024?",
+        tasks=[task],
+    )
+    assert plan.query_type == "single"
     assert len(plan.tasks) == 1
-    assert plan.tasks[0].query == "NVDA revenue 2024"
 
 
-def test_task_plan_accepts_empty_tasks():
-    plan = TaskPlan(tasks=[])
+def test_query_plan_comparison():
+    plan = QueryPlan(
+        reasoning="Two companies, same metric.",
+        query_type="comparison",
+        resolved_query="Compare NVDA and AMD revenue.",
+        tasks=[
+            RetrievalTask(query="revenue net sales", filter=MetadataFilter(ticker="NVDA")),
+            RetrievalTask(query="revenue net sales", filter=MetadataFilter(ticker="AMD")),
+        ],
+    )
+    assert plan.query_type == "comparison"
+    assert len(plan.tasks) == 2
+
+
+def test_query_plan_out_of_scope_has_empty_tasks():
+    plan = QueryPlan(
+        reasoning="Not answerable from 10-K filings.",
+        query_type="out_of_scope",
+        resolved_query="What is the weather today?",
+        tasks=[],
+    )
+    assert plan.query_type == "out_of_scope"
     assert plan.tasks == []
 
 
-def test_task_plan_has_json_schema():
-    schema = TaskPlan.model_json_schema()
+def test_query_plan_rejects_invalid_query_type():
+    with pytest.raises(ValidationError):
+        QueryPlan(
+            reasoning="test",
+            query_type="multi_hop",
+            resolved_query="query",
+            tasks=[],
+        )
+
+
+@pytest.mark.parametrize("qt", ["out_of_scope", "single", "comparison"])
+def test_query_plan_accepts_all_valid_types(qt):
+    plan = QueryPlan(reasoning="test", query_type=qt, resolved_query="query", tasks=[])
+    assert plan.query_type == qt
+
+
+def test_query_plan_has_json_schema():
+    schema = QueryPlan.model_json_schema()
+    assert "reasoning" in schema["properties"]
+    assert "query_type" in schema["properties"]
+    assert "resolved_query" in schema["properties"]
     assert "tasks" in schema["properties"]
+
+
+def test_query_plan_resolved_query_has_description_in_schema():
+    schema = QueryPlan.model_json_schema()
+    assert "description" in schema["properties"]["resolved_query"]
 
 
 # ---------------------------------------------------------------------------
@@ -178,13 +204,13 @@ def test_generation_result_fields():
 # Pydantic models are usable as chat_structured schemas
 # ---------------------------------------------------------------------------
 
-@pytest.mark.parametrize("cls", [QueryClassification, TaskPlan, HopDecision, ReflectionDecision])
+@pytest.mark.parametrize("cls", [QueryPlan, HopDecision, ReflectionDecision])
 def test_llm_output_types_have_json_schema(cls):
     schema = cls.model_json_schema()
     assert isinstance(schema, dict)
     assert "properties" in schema
 
 
-@pytest.mark.parametrize("cls", [QueryClassification, TaskPlan, HopDecision, ReflectionDecision])
+@pytest.mark.parametrize("cls", [QueryPlan, HopDecision, ReflectionDecision])
 def test_llm_output_types_are_pydantic_models(cls):
     assert issubclass(cls, BaseModel)

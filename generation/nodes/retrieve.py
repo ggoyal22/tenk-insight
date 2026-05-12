@@ -13,23 +13,23 @@ logger = logging.getLogger(__name__)
 
 class RetrieveInput(TypedDict):
     task: RetrievalTask
-    hyde_query: str | None
 
 
 def make_retrieve(retriever: Retriever, embedder: Embedder) -> Callable[[RetrieveInput], dict]:
     def retrieve(state: RetrieveInput) -> dict:
         task = state["task"]
-        hyde_query = state["hyde_query"]
+        hyde_query = task.hyde_query
 
         write = get_writer()
         f = task.filter
+        query_snippet = task.query[:50]
         if f and (f.ticker or f.form_type):
             parts = [p for p in [f.ticker, f.form_type] if p]
             if f.fiscal_year_end:
                 parts.append(f"({f.fiscal_year_end.year})")
-            write(f"Searching {' '.join(parts)}...")
+            write(f"Searching {' '.join(parts)} · {query_snippet}...")
         else:
-            write(f"Searching: {task.query[:60]}...")
+            write(f"Searching: {query_snippet}...")
 
         # Embed hyde_query for vector search when available — the hypothetical passage
         # is closer in embedding space to relevant chunks than the raw question.

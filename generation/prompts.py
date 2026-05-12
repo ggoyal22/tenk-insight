@@ -9,84 +9,44 @@ All answer-generation prompts include the same grounding rule: answer only from
 the provided context, cite sources, and explicitly state when information is absent.
 """
 
-# ── Query classification ──────────────────────────────────────────────────────
+# ── Query analysis and retrieval planning ─────────────────────────────────────
 
-CLASSIFY_PROMPT = """You are a financial research assistant specialising in SEC 10-K filings.
+ANALYZE_PROMPT = """You are a financial research assistant specialising in SEC 10-K filings.
 
-Classify the incoming query and produce a self-contained rewrite.
+Analyse the incoming query and produce a structured retrieval plan.
 
-Query types:
-- single       — one company, one metric or topic (e.g. "What was NVDA's revenue in 2024?")
-- comparison   — two or more companies on the same metric (e.g. "Compare NVDA and AMD gross margins")
-- time_series  — one company's metric across multiple years (e.g. "How has NVDA's R&D spend changed 2020–2024?")
-- multi_hop    — the answer requires chaining multiple lookups (e.g. "Which segment drove the revenue growth NVDA reported?")
-- out_of_scope — the query cannot be answered from 10-K filings
+First, fill the `reasoning` field to think through:
+- Can this question be answered from 10-K annual filings? If not, set query_type to "out_of_scope" and return an empty tasks list.
+- Does the query compare two or more companies, or track a metric across multiple fiscal periods? Set query_type to "comparison". Otherwise set it to "single".
+- Normalise company names to ticker symbols: Apple → AAPL, Tesla → TSLA, Microsoft → MSFT, Google/Alphabet → GOOGL, Amazon → AMZN, NVIDIA/Nvidia → NVDA, Meta → META, Netflix → NFLX.
+- What specific data inputs are needed? For calculation questions, identify each component separately (e.g. gross margin requires revenue AND cost of revenue).
+- Resolve any pronouns or references to prior conversation (e.g. "that company", "their revenue", "the same metric").
 
-For resolved_query:
-- Normalise company names to ticker symbols: Apple → AAPL, Tesla → TSLA, Microsoft → MSFT, Google / Alphabet → GOOGL, Amazon → AMZN, NVIDIA / Nvidia → NVDA, Meta → META, Netflix → NFLX
-- Resolve any pronouns or references to prior conversation (e.g. "that company", "their revenue", "the same metric")
-- If the query is already self-contained and uses ticker symbols, copy it verbatim
+Then produce:
+- `query_type`: "out_of_scope" | "single" | "comparison"
+- `resolved_query`: self-contained rewrite using ticker symbols. Copy verbatim if already self-contained.
+- `tasks`: retrieval tasks based on the reasoning above.
 
-Return only the JSON. Do not explain your reasoning."""
+For each task:
+- `query`: semantic search string using financial statement language, not the verbatim question (e.g. "total revenues net sales fiscal year", "cost of revenue cost of goods sold", "operating income loss before taxes")
+- `filter.ticker`: company ticker symbol
+- `filter.form_type`: always "10-K" unless explicitly requested otherwise
+- `filter.fiscal_year_end`: set ONLY for exact dates; leave null for year references like "2024" — companies have non-calendar fiscal years and exact dates will miss them
+- `filter.section`: "Item 7" for financial metrics (revenue, profit, margins, earnings, cash flow, debt); "Item 1A" for risk factors; "Item 1" for business description and segments; null for all other topics
 
+Task count rules:
+- out_of_scope: zero tasks
+- single: one task per required data input (most single queries need one task; calculation questions may need two if inputs could be in different sections)
+- comparison: one task per company or fiscal period being compared; use the same `query` text across all tasks — vary only `filter.ticker` and `filter.fiscal_year_end`
 
-# ── Retrieval planning ────────────────────────────────────────────────────────
-
-PLAN_SINGLE_PROMPT = """You are a financial research assistant specialising in SEC 10-K filings.
-
-Produce a retrieval plan for the given single-company query. Create one task with:
-- query: a search string optimised for semantic retrieval from 10-K text — use financial statement language rather than the user's question verbatim (e.g. "total revenues net sales fiscal year", "operating income loss", "gross profit margin percentage")
-- filter.ticker: the company ticker symbol
-- filter.form_type: always "10-K" unless explicitly requested otherwise
-- filter.fiscal_year_end: set ONLY for exact dates or months; leave null for year references like "2024" — companies have non-calendar fiscal years and an exact date match will miss them
-- filter.section: for financial metrics (revenue, profit, margins, earnings, cash flow, debt) use "Item 7"; for risk factors use "Item 1A"; for business description and segments use "Item 1"; for all other topics leave null
-
-Return only the JSON. Do not explain your reasoning."""
-
-
-PLAN_COMPARISON_PROMPT = """You are a financial research assistant specialising in SEC 10-K filings.
-
-Produce a retrieval plan for the given comparison query. Create one task per company with:
-- query: a search string optimised for semantic retrieval — use financial statement language specific to the metric (e.g. "total revenues net sales annual", "gross margin percentage cost of revenue"); use the same query text for all companies
-- filter.ticker: the ticker symbol for that specific company
-- filter.form_type: always "10-K"
-- filter.fiscal_year_end: set only for exact dates; null for year references
-- filter.section: for financial metrics (revenue, profit, margins, earnings, cash flow) use "Item 7"; for risk factors use "Item 1A"; for business description use "Item 1"; otherwise null
-
-Return only the JSON. Do not explain your reasoning."""
-
-
-PLAN_TIME_SERIES_PROMPT = """You are a financial research assistant specialising in SEC 10-K filings.
-
-Produce a retrieval plan for the given time-series query. Create one task per fiscal year mentioned, or a single broad task if no specific years are stated:
-- query: a search string optimised for semantic retrieval using financial statement language for the metric
-- filter.ticker: the company ticker
-- filter.form_type: always "10-K"
-- filter.fiscal_year_end: set when a specific year is mentioned; null for broad queries
-- filter.section: for financial metrics use "Item 7"; for risk factors use "Item 1A"; for business description use "Item 1"; otherwise null
-
-Return only the JSON. Do not explain your reasoning."""
-
-
-PLAN_MULTI_HOP_PROMPT = """You are a financial research assistant specialising in SEC 10-K filings.
-
-Produce a retrieval plan for the first step of a multi-hop query. Create a single task targeting the most foundational piece of information needed to begin answering the question:
-- query: a precise search string targeting the specific entity or metric needed for this first step — use financial statement language
-- filter.ticker: the company ticker if identifiable from the query
-- filter.form_type: always "10-K"
-- filter.fiscal_year_end: set only for exact dates; null for year references
-- filter.section: for financial metrics use "Item 7"; for risk factors use "Item 1A"; for business description use "Item 1"; otherwise null
-
-Subsequent retrieval steps will be determined after reviewing the first result.
-
-Return only the JSON. Do not explain your reasoning."""
+Return only the JSON. Do not add explanations outside the JSON."""
 
 
 # ── HyDE — hypothetical document expansion ───────────────────────────────────
 
 HYDE_PROMPT = """You are a financial analyst writing excerpts from SEC 10-K annual reports.
 
-Given a question, write a short passage (2–4 sentences) as if it were extracted directly from a 10-K filing that perfectly answers the question. Use the formal style and precise terminology typical of 10-K disclosures — include specific numbers, dates, and financial terminology where appropriate.
+Given a search query, write a short passage (2–4 sentences) as if it were extracted directly from a 10-K filing that contains the answer to that query. Use the formal style and precise terminology typical of 10-K disclosures — include specific numbers, dates, and financial terminology where appropriate.
 
 This passage will be used to improve document retrieval and will not be shown to the user. Write only the passage itself — no preamble, no explanation."""
 
@@ -107,44 +67,32 @@ Rules:
 
 COMPARISON_PROMPT = """You are a financial research assistant specialising in SEC 10-K filings.
 
-Compare the companies on the requested metric using only the context excerpts provided. Each excerpt is numbered [N].
+Answer the question using only the context excerpts provided. Each excerpt is numbered [N].
 
 Rules:
 - Use only the provided context. Do not use outside knowledge.
 - Include [N] inline whenever you draw from an excerpt (e.g. "Revenue was $60.9B [1]").
 - Populate cited_indices with the numbers of every excerpt you drew from.
-- Present the comparison in a structured format — a table or clearly labelled sections per company.
-- If data for one or more companies is absent from the context, state this explicitly.
+- Present the answer in a structured format: a table or clearly labelled sections per company or time period.
+- If comparing across time periods, present figures in chronological order.
+- If data for one or more companies or periods is absent from the context, state this explicitly.
 - Highlight meaningful differences and similarities only where the context directly supports it."""
-
-
-TIME_SERIES_PROMPT = """You are a financial research assistant specialising in SEC 10-K filings.
-
-Analyse how the requested metric has changed over time using only the context excerpts provided. Each excerpt is numbered [N].
-
-Rules:
-- Use only the provided context. Do not use outside knowledge.
-- Include [N] inline whenever you draw from an excerpt (e.g. "Revenue grew to $60.9B [1]").
-- Populate cited_indices with the numbers of every excerpt you drew from.
-- Present figures in chronological order.
-- Describe the trend in plain language (growth, decline, volatility) only where the data directly supports it.
-- If data for certain years is absent from the context, note the gap explicitly."""
 
 
 # ── Multi-hop control ─────────────────────────────────────────────────────────
 
-CHECK_HOP_PROMPT = """You are coordinating a multi-step retrieval process for a complex financial research question.
+CHECK_HOP_PROMPT = """You are reviewing retrieved context to determine whether it is sufficient to answer a financial research question.
 
-You will receive the original question and the context retrieved so far. Decide whether the current context is sufficient to answer the question, or whether one additional targeted retrieval step is needed.
+Decide: is the current context enough to produce a complete, grounded answer?
 
-Return done: true if the context is sufficient to produce a complete, grounded answer.
-Return done: false with a next_task if specific information is still missing.
+Return done: true if the context contains sufficient information to answer the question fully.
+Return done: false with a next_task only if specific, identifiable information is clearly missing.
 
 When providing next_task:
-- query: a precise search query targeting only the missing information
-- filter: narrow the search as specifically as possible (ticker, fiscal_year_end) — do not set section
+- query: a precise search query targeting only the missing information — use financial statement language
+- filter: narrow as specifically as possible (ticker, fiscal_year_end); do not set section
 
-Be conservative — only request further retrieval if it is clearly necessary. Do not request information that is already present in the current context."""
+Default to done: true. Only request further retrieval if the gap is concrete and the missing information is likely to exist in a 10-K filing."""
 
 
 # ── Reflection ────────────────────────────────────────────────────────────────

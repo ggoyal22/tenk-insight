@@ -17,23 +17,20 @@ class RetrievalTask(BaseModel):
     """A single retrieval request: a search query plus optional metadata filters."""
     query: str
     filter: MetadataFilter | None = None
+    hyde_query: str | None = None
 
 
-class QueryClassification(BaseModel):
-    """Structured output of the classify_query node."""
-    query_type: Literal["single", "comparison", "time_series", "multi_hop", "out_of_scope"]
+class QueryPlan(BaseModel):
+    """Structured output of the analyze_query node."""
+    reasoning: str = Field(description="Scratchpad — think through inputs needed before planning tasks.")
+    query_type: Literal["out_of_scope", "single", "comparison"]
     resolved_query: str = Field(
         description=(
-            "Self-contained rewrite of the query resolving any pronouns or references "
-            "from conversation history (e.g. 'that', 'their', 'the same'). "
-            "Normalise company names to ticker symbols (Apple → AAPL, Tesla → TSLA). "
-            "Copy verbatim if the query is already self-contained and uses ticker symbols."
+            "Self-contained rewrite resolving pronouns and company name references. "
+            "Normalise to ticker symbols (Apple → AAPL, NVIDIA → NVDA). "
+            "Copy verbatim if already self-contained."
         )
     )
-
-
-class TaskPlan(BaseModel):
-    """Structured output of the plan_tasks node."""
     tasks: list[RetrievalTask]
 
 
@@ -92,7 +89,6 @@ class GenerationState(TypedDict):
     query_type: str
     resolved_query: str | None
     pending_tasks: list[RetrievalTask]
-    hyde_query: str | None
     # Reducer appends each retrieve node's result list — preserves which results
     # came from which task so generate can build per-source citations.
     completed_results: Annotated[list[list[RetrievalResult]], operator.add]

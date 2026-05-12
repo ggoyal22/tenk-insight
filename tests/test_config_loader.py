@@ -343,7 +343,7 @@ def test_generation_valid_config():
     config = GenerationConfig(**VALID_GENERATION)
     assert config.hyde.enabled == VALID_GENERATION["hyde"]["enabled"]
     assert config.reflection.max_iterations == VALID_GENERATION["reflection"]["max_iterations"]
-    assert config.multi_hop.max_hops == VALID_GENERATION["multi_hop"]["max_hops"]
+    assert config.hop.max_hops == VALID_GENERATION["hop"]["max_hops"]
 
 
 def test_generation_defaults_are_sensible():
@@ -351,7 +351,7 @@ def test_generation_defaults_are_sensible():
     assert config.hyde.enabled is True
     assert config.reflection.enabled is True
     assert config.reflection.max_iterations > 0
-    assert config.multi_hop.max_hops > 0
+    assert config.hop.max_hops > 0
 
 
 def test_generation_rejects_zero_max_iterations():
@@ -361,7 +361,7 @@ def test_generation_rejects_zero_max_iterations():
 
 def test_generation_rejects_zero_max_hops():
     with pytest.raises(ValidationError):
-        GenerationConfig(**{**VALID_GENERATION, "multi_hop": {"max_hops": 0}})
+        GenerationConfig(**{**VALID_GENERATION, "hop": {"enabled": False, "max_hops": 0}})
 
 
 # ---------------------------------------------------------------------------

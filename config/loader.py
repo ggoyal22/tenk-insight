@@ -186,20 +186,21 @@ class HydeConfig(BaseModel):
     enabled: bool = True
 
 
+class HopConfig(BaseModel):
+    enabled: bool = False
+    max_hops: int = Field(gt=0, default=3)
+
+
 class ReflectionConfig(BaseModel):
     enabled: bool = True
     max_iterations: int = Field(gt=0, default=2)
 
 
-class MultiHopConfig(BaseModel):
-    max_hops: int = Field(gt=0, default=3)
-
-
 class GenerationConfig(BaseModel):
     hyde: HydeConfig = Field(default_factory=HydeConfig)
+    hop: HopConfig = Field(default_factory=HopConfig)
     reflection: ReflectionConfig = Field(default_factory=ReflectionConfig)
-    multi_hop: MultiHopConfig = Field(default_factory=MultiHopConfig)
-    eval_stop_after: Literal["classify_query", "plan_tasks", "hyde_expand", "retrieve", "check_hop", "generate", "reflect"] | None = None
+    eval_stop_after: Literal["analyze_query", "hyde_expand", "retrieve", "check_hop", "generate", "reflect"] | None = None
 
 
 class LoggingConfig(BaseModel):

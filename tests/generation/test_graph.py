@@ -16,12 +16,12 @@ from config.loader import GenerationConfig
 from generation.factory import make_initial_state
 from generation.graph import build_graph
 from generation.nodes import (
-    make_check_hop, make_classify_query, make_generate,
-    make_hyde_expand, make_plan_tasks, make_reflect, make_retrieve,
+    make_analyze_query, make_check_hop, make_generate,
+    make_hyde_expand, make_reflect, make_retrieve,
 )
 from generation.types import (
-    GenerationResponse, GenerationResult, HopDecision, QueryClassification,
-    ReflectionDecision, RetrievalTask, TaskPlan,
+    GenerationResponse, GenerationResult, HopDecision, QueryPlan,
+    ReflectionDecision, RetrievalTask,
 )
 from llm.types import LLMResponse, LLMUsage, StructuredResponse
 from retrieval.types import MetadataFilter, RetrievalResult
@@ -32,14 +32,6 @@ from tests.conftest import VALID_GENERATION
 # ---------------------------------------------------------------------------
 # Shared helpers
 # ---------------------------------------------------------------------------
-
-_PLAN_PROMPTS = {
-    "single": "Plan single-company tasks.",
-    "comparison": "Plan comparison tasks.",
-    "time_series": "Plan time-series tasks.",
-    "multi_hop": "Plan multi-hop tasks.",
-}
-
 
 def _usage() -> LLMUsage:
     return LLMUsage(input_tokens=10, output_tokens=20)
@@ -81,7 +73,6 @@ def _make_retriever(results=None) -> MagicMock:
 
 
 def _make_filings_repo(tickers_in_db: list[str] | None = None) -> MagicMock:
-    """Return a mock FilingsRepo. By default all tickers are considered indexed."""
     repo = MagicMock()
     if tickers_in_db is None:
         repo.list_ids.return_value = [uuid.uuid4()]
@@ -95,11 +86,10 @@ def _make_filings_repo(tickers_in_db: list[str] | None = None) -> MagicMock:
 
 def _build_graph(llm, retriever, embedder, config: GenerationConfig, filings_repo=None):
     return build_graph(
-        classify_query_fn=make_classify_query(llm, "Classify the query."),
-        plan_tasks_fn=make_plan_tasks(llm, _PLAN_PROMPTS, filings_repo or _make_filings_repo()),
+        analyze_query_fn=make_analyze_query(llm, "Analyze the query.", filings_repo or _make_filings_repo()),
         hyde_expand_fn=make_hyde_expand(llm, "Write a hypothetical passage."),
         retrieve_fn=make_retrieve(retriever, embedder),
-        generate_fn=make_generate(llm, "Answer the question.", "Compare the companies.", "Analyse how."),
+        generate_fn=make_generate(llm, "Answer the question.", "Compare the companies."),
         check_hop_fn=make_check_hop(llm, config, "Decide if more retrieval is needed."),
         reflect_fn=make_reflect(llm, config, "Evaluate the answer quality."),
         config=config,
@@ -111,12 +101,21 @@ def _gen_config(**overrides) -> GenerationConfig:
     return GenerationConfig(**data)
 
 
+def _make_query_plan(query_type="single", resolved_query="What was NVDA's revenue in 2024?", tasks=None) -> QueryPlan:
+    return QueryPlan(
+        reasoning="Test reasoning.",
+        query_type=query_type,
+        resolved_query=resolved_query,
+        tasks=tasks if tasks is not None else [RetrievalTask(query="NVDA revenue 2024")],
+    )
+
+
 # ---------------------------------------------------------------------------
 # Happy path — single query, no HyDE, no reflection
 # ---------------------------------------------------------------------------
 
 def test_single_query_produces_answer():
-    """classify → plan → retrieve → generate → END"""
+    """analyze → retrieve → generate → END"""
     config = _gen_config(
         hyde={"enabled": False},
         reflection={"enabled": False, "max_iterations": 2},
@@ -124,19 +123,8 @@ def test_single_query_produces_answer():
     llm = MagicMock()
 
     def chat_structured_side_effect(messages, schema):
-        if schema == QueryClassification:
-            return StructuredResponse(
-                parsed=QueryClassification(
-                    query_type="single",
-                    resolved_query="What was NVDA's revenue in 2024?",
-                ),
-                usage=_usage(),
-            )
-        if schema == TaskPlan:
-            return StructuredResponse(
-                parsed=TaskPlan(tasks=[RetrievalTask(query="NVDA revenue 2024")]),
-                usage=_usage(),
-            )
+        if schema == QueryPlan:
+            return StructuredResponse(parsed=_make_query_plan(), usage=_usage())
         if schema == GenerationResponse:
             return StructuredResponse(
                 parsed=GenerationResponse(answer="Revenue was $60.9B.", cited_indices=[1]),
@@ -155,11 +143,11 @@ def test_single_query_produces_answer():
 
 
 # ---------------------------------------------------------------------------
-# resolved_query — classify node stores normalised query in state
+# resolved_query — stored in state and used downstream
 # ---------------------------------------------------------------------------
 
 def test_resolved_query_stored_in_state():
-    """classify sets resolved_query; downstream nodes use it instead of raw query."""
+    """analyze sets resolved_query; downstream nodes use it instead of raw query."""
     config = _gen_config(
         hyde={"enabled": False},
         reflection={"enabled": False, "max_iterations": 2},
@@ -167,17 +155,9 @@ def test_resolved_query_stored_in_state():
     llm = MagicMock()
 
     def chat_structured_side_effect(messages, schema):
-        if schema == QueryClassification:
+        if schema == QueryPlan:
             return StructuredResponse(
-                parsed=QueryClassification(
-                    query_type="single",
-                    resolved_query="What was NVDA's revenue in FY2024?",
-                ),
-                usage=_usage(),
-            )
-        if schema == TaskPlan:
-            return StructuredResponse(
-                parsed=TaskPlan(tasks=[RetrievalTask(query="NVDA revenue fiscal year 2024")]),
+                parsed=_make_query_plan(resolved_query="What was NVDA's revenue in FY2024?"),
                 usage=_usage(),
             )
         if schema == GenerationResponse:
@@ -196,18 +176,23 @@ def test_resolved_query_stored_in_state():
 
 
 # ---------------------------------------------------------------------------
-# Out of scope — terminates after classify without reaching plan
+# Out of scope — terminates after analyze without reaching retrieve
 # ---------------------------------------------------------------------------
 
 def test_out_of_scope_query_terminates_without_answer():
-    """classify (out_of_scope) → END (no plan, no retrieval) with canned answer"""
+    """analyze (out_of_scope) → END with canned answer; no retrieval"""
     config = _gen_config(
         hyde={"enabled": False},
         reflection={"enabled": False, "max_iterations": 2},
     )
     llm = MagicMock()
     llm.chat_structured.return_value = StructuredResponse(
-        parsed=QueryClassification(query_type="out_of_scope", resolved_query="What is the weather today?"),
+        parsed=QueryPlan(
+            reasoning="Not a 10-K question.",
+            query_type="out_of_scope",
+            resolved_query="What is the weather today?",
+            tasks=[],
+        ),
         usage=_usage(),
     )
 
@@ -216,34 +201,30 @@ def test_out_of_scope_query_terminates_without_answer():
 
     assert isinstance(final["answer"], GenerationResult)
     assert "can't be answered from SEC 10-K filings" in final["answer"].answer
-    # plan_tasks and generate never ran — only classify called chat_structured
     assert llm.chat_structured.call_count == 1
     llm.chat.assert_not_called()
 
 
 # ---------------------------------------------------------------------------
-# Empty tasks — plan produces no tasks → terminates with canned answer
+# Empty tasks — terminates after analyze with canned answer
 # ---------------------------------------------------------------------------
 
-def test_empty_tasks_terminates_without_answer():
-    """classify → plan (no tasks) → END with canned answer"""
+def test_empty_tasks_terminates_without_retrieval():
+    """analyze (no tasks) → END with canned answer"""
     config = _gen_config(
         hyde={"enabled": False},
         reflection={"enabled": False, "max_iterations": 2},
     )
     llm = MagicMock()
-
-    def chat_structured_side_effect(messages, schema):
-        if schema == QueryClassification:
-            return StructuredResponse(
-                parsed=QueryClassification(query_type="single", resolved_query="What was NVDA's revenue?"),
-                usage=_usage(),
-            )
-        if schema == TaskPlan:
-            return StructuredResponse(parsed=TaskPlan(tasks=[]), usage=_usage())
-        raise ValueError(f"Unexpected schema: {schema}")
-
-    llm.chat_structured.side_effect = chat_structured_side_effect
+    llm.chat_structured.return_value = StructuredResponse(
+        parsed=QueryPlan(
+            reasoning="Could not plan tasks.",
+            query_type="single",
+            resolved_query="What was NVDA's revenue?",
+            tasks=[],
+        ),
+        usage=_usage(),
+    )
 
     graph = _build_graph(llm, _make_retriever(), _make_embedder(), config)
     final = graph.invoke(make_initial_state("What was NVDA's revenue?"))
@@ -254,61 +235,50 @@ def test_empty_tasks_terminates_without_answer():
 
 
 def test_empty_tasks_with_hyde_skips_hyde_and_returns_canned_answer():
-    """classify → plan (no tasks) → END — guard fires before HyDE when tasks are empty"""
+    """analyze (no tasks) → END — guard fires before HyDE when tasks are empty"""
     config = _gen_config(
         hyde={"enabled": True},
         reflection={"enabled": False, "max_iterations": 2},
     )
     llm = MagicMock()
-
-    def chat_structured_side_effect(messages, schema):
-        if schema == QueryClassification:
-            return StructuredResponse(
-                parsed=QueryClassification(query_type="single", resolved_query="What was NVDA's revenue?"),
-                usage=_usage(),
-            )
-        if schema == TaskPlan:
-            return StructuredResponse(parsed=TaskPlan(tasks=[]), usage=_usage())
-        raise ValueError(f"Unexpected schema: {schema}")
-
-    llm.chat_structured.side_effect = chat_structured_side_effect
+    llm.chat_structured.return_value = StructuredResponse(
+        parsed=QueryPlan(
+            reasoning="Could not plan tasks.",
+            query_type="single",
+            resolved_query="What was NVDA's revenue?",
+            tasks=[],
+        ),
+        usage=_usage(),
+    )
 
     graph = _build_graph(llm, _make_retriever(), _make_embedder(), config)
     final = graph.invoke(make_initial_state("What was NVDA's revenue?"))
 
     assert isinstance(final["answer"], GenerationResult)
     assert "trouble understanding" in final["answer"].answer
-    llm.chat.assert_not_called()  # HyDE never ran
+    llm.chat.assert_not_called()
 
 
 # ---------------------------------------------------------------------------
-# Ticker not indexed — short-circuits in plan with canned answer
+# Ticker not indexed — short-circuits in analyze with canned answer
 # ---------------------------------------------------------------------------
 
-def test_unknown_ticker_returns_canned_answer():
-    """classify → plan (ticker not in DB) → END with canned answer, no HyDE, no retrieval"""
+def test_all_tickers_missing_returns_canned_answer():
+    """analyze (ticker not in DB) → END with canned answer, no HyDE, no retrieval"""
     config = _gen_config(
         hyde={"enabled": True},
         reflection={"enabled": False, "max_iterations": 2},
     )
     llm = MagicMock()
-
-    def chat_structured_side_effect(messages, schema):
-        if schema == QueryClassification:
-            return StructuredResponse(
-                parsed=QueryClassification(query_type="single", resolved_query="What was FAKE's revenue?"),
-                usage=_usage(),
-            )
-        if schema == TaskPlan:
-            return StructuredResponse(
-                parsed=TaskPlan(tasks=[
-                    RetrievalTask(query="FAKE revenue", filter=MetadataFilter(ticker="FAKE")),
-                ]),
-                usage=_usage(),
-            )
-        raise ValueError(f"Unexpected schema: {schema}")
-
-    llm.chat_structured.side_effect = chat_structured_side_effect
+    llm.chat_structured.return_value = StructuredResponse(
+        parsed=QueryPlan(
+            reasoning="Single company lookup.",
+            query_type="single",
+            resolved_query="What was FAKE's revenue?",
+            tasks=[RetrievalTask(query="FAKE revenue", filter=MetadataFilter(ticker="FAKE"))],
+        ),
+        usage=_usage(),
+    )
 
     graph = _build_graph(
         llm, _make_retriever(), _make_embedder(), config,
@@ -319,15 +289,15 @@ def test_unknown_ticker_returns_canned_answer():
     assert isinstance(final["answer"], GenerationResult)
     assert "FAKE" in final["answer"].answer
     assert "don't have filings" in final["answer"].answer
-    llm.chat.assert_not_called()  # HyDE never ran
+    llm.chat.assert_not_called()
 
 
 # ---------------------------------------------------------------------------
-# HyDE — passes hypothetical passage to retrieve
+# HyDE — per-task hypothetical passages passed to retrieve
 # ---------------------------------------------------------------------------
 
 def test_hyde_passage_is_used_for_embedding():
-    """classify → plan → hyde_expand → retrieve (uses hyde_query) → generate → END"""
+    """analyze → hyde_expand → retrieve (uses task.hyde_query) → generate → END"""
     config = _gen_config(
         hyde={"enabled": True},
         reflection={"enabled": False, "max_iterations": 2},
@@ -335,16 +305,8 @@ def test_hyde_passage_is_used_for_embedding():
     llm = MagicMock()
 
     def chat_structured_side_effect(messages, schema):
-        if schema == QueryClassification:
-            return StructuredResponse(
-                parsed=QueryClassification(query_type="single", resolved_query="What was NVDA's revenue?"),
-                usage=_usage(),
-            )
-        if schema == TaskPlan:
-            return StructuredResponse(
-                parsed=TaskPlan(tasks=[RetrievalTask(query="NVDA revenue 2024")]),
-                usage=_usage(),
-            )
+        if schema == QueryPlan:
+            return StructuredResponse(parsed=_make_query_plan(), usage=_usage())
         if schema == GenerationResponse:
             return StructuredResponse(
                 parsed=GenerationResponse(answer="Revenue was $60.9B.", cited_indices=[1]),
@@ -359,9 +321,7 @@ def test_hyde_passage_is_used_for_embedding():
     graph = _build_graph(llm, _make_retriever(), embedder, config)
     graph.invoke(make_initial_state("What was NVDA's revenue?"))
 
-    # hyde_expand uses chat(); generate uses chat_structured()
     assert llm.chat.call_count == 1
-    # Embedder should have been called with the hypothetical passage, not the raw query
     embedded_text = embedder.embed.call_args[0][0][0]
     assert embedded_text == "Hypothetical passage."
 
@@ -371,7 +331,7 @@ def test_hyde_passage_is_used_for_embedding():
 # ---------------------------------------------------------------------------
 
 def test_reflection_high_quality_ends_pipeline():
-    """classify → plan → retrieve → generate → reflect (high) → END"""
+    """analyze → retrieve → generate → reflect (high) → END"""
     config = _gen_config(
         hyde={"enabled": False},
         reflection={"enabled": True, "max_iterations": 2},
@@ -379,16 +339,8 @@ def test_reflection_high_quality_ends_pipeline():
     llm = MagicMock()
 
     def chat_structured_side_effect(messages, schema):
-        if schema == QueryClassification:
-            return StructuredResponse(
-                parsed=QueryClassification(query_type="single", resolved_query="What was NVDA's revenue?"),
-                usage=_usage(),
-            )
-        if schema == TaskPlan:
-            return StructuredResponse(
-                parsed=TaskPlan(tasks=[RetrievalTask(query="NVDA revenue 2024")]),
-                usage=_usage(),
-            )
+        if schema == QueryPlan:
+            return StructuredResponse(parsed=_make_query_plan(), usage=_usage())
         if schema == GenerationResponse:
             return StructuredResponse(
                 parsed=GenerationResponse(answer="Revenue was $60.9B.", cited_indices=[1]),
@@ -415,7 +367,7 @@ def test_reflection_high_quality_ends_pipeline():
 # ---------------------------------------------------------------------------
 
 def test_reflection_low_quality_triggers_extra_retrieval():
-    """classify → plan → retrieve → generate → reflect (low) → retrieve → generate → reflect (high) → END"""
+    """analyze → retrieve → generate → reflect (low) → retrieve → generate → reflect (high) → END"""
     config = _gen_config(
         hyde={"enabled": False},
         reflection={"enabled": True, "max_iterations": 2},
@@ -424,16 +376,8 @@ def test_reflection_low_quality_triggers_extra_retrieval():
     llm = MagicMock()
 
     def chat_structured_side_effect(messages, schema):
-        if schema == QueryClassification:
-            return StructuredResponse(
-                parsed=QueryClassification(query_type="single", resolved_query="What was NVDA's revenue and margin?"),
-                usage=_usage(),
-            )
-        if schema == TaskPlan:
-            return StructuredResponse(
-                parsed=TaskPlan(tasks=[RetrievalTask(query="NVDA revenue 2024")]),
-                usage=_usage(),
-            )
+        if schema == QueryPlan:
+            return StructuredResponse(parsed=_make_query_plan(), usage=_usage())
         if schema == GenerationResponse:
             return StructuredResponse(
                 parsed=GenerationResponse(answer="Answer.", cited_indices=[1]),
@@ -463,7 +407,6 @@ def test_reflection_low_quality_triggers_extra_retrieval():
     final = graph.invoke(make_initial_state("What was NVDA's revenue and margin?"))
 
     assert final["reflection_count"] == 2
-    # retrieve was called twice: once from plan, once from reflect
     assert retriever.retrieve.call_count == 2
 
 
@@ -472,7 +415,7 @@ def test_reflection_low_quality_triggers_extra_retrieval():
 # ---------------------------------------------------------------------------
 
 def test_comparison_query_fans_out_to_parallel_retrieves():
-    """classify → plan → [retrieve#NVDA, retrieve#AMD] (parallel) → generate → END"""
+    """analyze → [retrieve#NVDA, retrieve#AMD] (parallel) → generate → END"""
     config = _gen_config(
         hyde={"enabled": False},
         reflection={"enabled": False, "max_iterations": 2},
@@ -480,20 +423,16 @@ def test_comparison_query_fans_out_to_parallel_retrieves():
     llm = MagicMock()
 
     def chat_structured_side_effect(messages, schema):
-        if schema == QueryClassification:
+        if schema == QueryPlan:
             return StructuredResponse(
-                parsed=QueryClassification(
+                parsed=_make_query_plan(
                     query_type="comparison",
                     resolved_query="Compare NVDA and AMD revenue",
+                    tasks=[
+                        RetrievalTask(query="revenue annual", filter=MetadataFilter(ticker="NVDA")),
+                        RetrievalTask(query="revenue annual", filter=MetadataFilter(ticker="AMD")),
+                    ],
                 ),
-                usage=_usage(),
-            )
-        if schema == TaskPlan:
-            return StructuredResponse(
-                parsed=TaskPlan(tasks=[
-                    RetrievalTask(query="NVDA revenue annual", filter=MetadataFilter(ticker="NVDA")),
-                    RetrievalTask(query="NVDA revenue annual", filter=MetadataFilter(ticker="AMD")),
-                ]),
                 usage=_usage(),
             )
         if schema == GenerationResponse:
@@ -516,39 +455,27 @@ def test_comparison_query_fans_out_to_parallel_retrieves():
     final = graph.invoke(make_initial_state("Compare NVDA and AMD revenue"))
 
     assert retriever.retrieve.call_count == 2
-    # Both result groups are in completed_results
     assert len(final["completed_results"]) == 2
     assert final["answer"].answer == "NVDA > AMD."
 
 
 # ---------------------------------------------------------------------------
-# Multi-hop — check_hop triggers a second retrieve then generates
+# Hop — check_hop enabled triggers iterative retrieval
 # ---------------------------------------------------------------------------
 
-def test_multi_hop_triggers_extra_retrieval():
-    """classify → plan → retrieve → check_hop (not done) → retrieve → check_hop (done) → generate → END"""
+def test_hop_enabled_triggers_extra_retrieval():
+    """analyze → retrieve → check_hop (not done) → retrieve → check_hop (done) → generate → END"""
     config = _gen_config(
         hyde={"enabled": False},
+        hop={"enabled": True, "max_hops": 3},
         reflection={"enabled": False, "max_iterations": 2},
-        multi_hop={"max_hops": 3},
     )
     hop_calls = {"count": 0}
     llm = MagicMock()
 
     def chat_structured_side_effect(messages, schema):
-        if schema == QueryClassification:
-            return StructuredResponse(
-                parsed=QueryClassification(
-                    query_type="multi_hop",
-                    resolved_query="What drove NVDA's revenue growth?",
-                ),
-                usage=_usage(),
-            )
-        if schema == TaskPlan:
-            return StructuredResponse(
-                parsed=TaskPlan(tasks=[RetrievalTask(query="NVDA revenue driver")]),
-                usage=_usage(),
-            )
+        if schema == QueryPlan:
+            return StructuredResponse(parsed=_make_query_plan(), usage=_usage())
         if schema == HopDecision:
             hop_calls["count"] += 1
             if hop_calls["count"] == 1:
@@ -559,10 +486,7 @@ def test_multi_hop_triggers_extra_retrieval():
                     ),
                     usage=_usage(),
                 )
-            return StructuredResponse(
-                parsed=HopDecision(done=True),
-                usage=_usage(),
-            )
+            return StructuredResponse(parsed=HopDecision(done=True), usage=_usage())
         if schema == GenerationResponse:
             return StructuredResponse(
                 parsed=GenerationResponse(answer="Data center drove growth.", cited_indices=[1]),
@@ -582,31 +506,53 @@ def test_multi_hop_triggers_extra_retrieval():
     assert final["answer"].answer == "Data center drove growth."
 
 
+def test_hop_disabled_skips_check_hop():
+    """analyze → retrieve → generate → END (check_hop never called)"""
+    config = _gen_config(
+        hyde={"enabled": False},
+        hop={"enabled": False, "max_hops": 3},
+        reflection={"enabled": False, "max_iterations": 2},
+    )
+    llm = MagicMock()
+
+    def chat_structured_side_effect(messages, schema):
+        if schema == QueryPlan:
+            return StructuredResponse(parsed=_make_query_plan(), usage=_usage())
+        if schema == GenerationResponse:
+            return StructuredResponse(
+                parsed=GenerationResponse(answer="Revenue was $60.9B.", cited_indices=[1]),
+                usage=_usage(),
+            )
+        raise ValueError(f"Unexpected schema: {schema}")
+
+    llm.chat_structured.side_effect = chat_structured_side_effect
+
+    retriever = _make_retriever()
+    graph = _build_graph(llm, retriever, _make_embedder(), config)
+    final = graph.invoke(make_initial_state("What was NVDA's revenue?"))
+
+    # HopDecision was never requested
+    called_schemas = [call[0][1] for call in llm.chat_structured.call_args_list]
+    assert HopDecision not in called_schemas
+    assert isinstance(final["answer"], GenerationResult)
+
+
 # ---------------------------------------------------------------------------
-# Reflection exhausted — persistent low quality terminates after max_iterations
+# Reflection exhausted — terminates after max_iterations
 # ---------------------------------------------------------------------------
 
 def test_reflection_exhausted_terminates_after_max_iterations():
-    """classify → plan → retrieve → generate → reflect (low) × max_iterations → END"""
+    """analyze → retrieve → generate → reflect (low) × max_iterations → END"""
     config = _gen_config(
         hyde={"enabled": False},
         reflection={"enabled": True, "max_iterations": 2},
     )
     llm = MagicMock()
-
     generation_calls = {"count": 0}
 
     def chat_structured_side_effect(messages, schema):
-        if schema == QueryClassification:
-            return StructuredResponse(
-                parsed=QueryClassification(query_type="single", resolved_query="What was NVDA's revenue?"),
-                usage=_usage(),
-            )
-        if schema == TaskPlan:
-            return StructuredResponse(
-                parsed=TaskPlan(tasks=[RetrievalTask(query="NVDA revenue 2024")]),
-                usage=_usage(),
-            )
+        if schema == QueryPlan:
+            return StructuredResponse(parsed=_make_query_plan(), usage=_usage())
         if schema == GenerationResponse:
             generation_calls["count"] += 1
             return StructuredResponse(
@@ -614,7 +560,6 @@ def test_reflection_exhausted_terminates_after_max_iterations():
                 usage=_usage(),
             )
         if schema == ReflectionDecision:
-            # Always returns low quality with a next_task — pipeline must self-terminate
             return StructuredResponse(
                 parsed=ReflectionDecision(
                     quality="low",
@@ -631,9 +576,6 @@ def test_reflection_exhausted_terminates_after_max_iterations():
     graph = _build_graph(llm, retriever, _make_embedder(), config)
     final = graph.invoke(make_initial_state("What was NVDA's revenue?"))
 
-    # Should stop after max_iterations reflections, not loop forever
     assert final["reflection_count"] == config.reflection.max_iterations
-    # generate ran once per reflection iteration
     assert generation_calls["count"] == config.reflection.max_iterations
-    # Final answer is the last generated one, not None
     assert isinstance(final["answer"], GenerationResult)
