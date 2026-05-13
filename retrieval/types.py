@@ -18,3 +18,5 @@ class RetrievalResult:
     chunk: ChunkRecord
     parent_chunk: ParentChunkRecord
     filing: FilingRecord
+    vector_score: float | None = None
+    keyword_score: float | None = None

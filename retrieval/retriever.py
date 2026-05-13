@@ -45,6 +45,8 @@ class Retriever:
         section = filters.section if filters else None
 
         ranked_lists: list[list[tuple[UUID, float]]] = []
+        vector_scores: dict[UUID, float] = {}
+        keyword_scores: dict[UUID, float] = {}
 
         if self._vector:
             vector_results = self._vector.search(
@@ -54,6 +56,7 @@ class Retriever:
                 section=section,
             )
             if vector_results:
+                vector_scores = {cid: s for cid, s in vector_results}
                 ranked_lists.append(vector_results)
 
         if self._keyword:
@@ -64,6 +67,7 @@ class Retriever:
                 section=section,
             )
             if keyword_results:
+                keyword_scores = {cid: s for cid, s in keyword_results}
                 ranked_lists.append(keyword_results)
 
         if not ranked_lists:
@@ -73,7 +77,7 @@ class Retriever:
         fused = self._fusion.fuse(*ranked_lists)
         fused = fused[: self._config.fusion.top_k]
 
-        results = self._enrich(fused)
+        results = self._enrich(fused, vector_scores, keyword_scores)
 
         if self._reranker and self._config.reranking.enabled:
             return self._reranker.rerank(query, results, self._config.reranking.top_k)
@@ -102,7 +106,12 @@ class Retriever:
 
         return filing_ids
 
-    def _enrich(self, fused: list[tuple[UUID, float]]) -> list[RetrievalResult]:
+    def _enrich(
+        self,
+        fused: list[tuple[UUID, float]],
+        vector_scores: dict[UUID, float],
+        keyword_scores: dict[UUID, float],
+    ) -> list[RetrievalResult]:
         """Batch-fetch chunks, parent chunks, and filings; assemble RetrievalResult objects."""
         if not fused:
             return []
@@ -143,6 +152,8 @@ class Retriever:
                 chunk=chunk,
                 parent_chunk=parent,
                 filing=filing,
+                vector_score=vector_scores.get(chunk_id),
+                keyword_score=keyword_scores.get(chunk_id),
             ))
 
         return results
