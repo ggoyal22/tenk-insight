@@ -20,10 +20,10 @@ def make_hyde_expand(llm: BaseLLM, prompt: str) -> Callable[[GenerationState], d
         def _expand_one(task: RetrievalTask) -> tuple[RetrievalTask, LLMUsage]:
             messages = [
                 Message(role="system", content=prompt),
-                Message(role="user", content=task.query),
+                Message(role="user", content=task.semantic_query),
             ]
             response = llm.chat(messages)
-            logger.debug("HyDE passage generated for query %r (%d chars).", task.query, len(response.content))
+            logger.debug("HyDE passage generated for query %r (%d chars).", task.semantic_query, len(response.content))
             return task.model_copy(update={"hyde_query": response.content}), response.usage
 
         with ThreadPoolExecutor(max_workers=total) as executor:

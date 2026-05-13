@@ -106,7 +106,7 @@ def _make_query_plan(query_type="single", resolved_query="What was NVDA's revenu
         reasoning="Test reasoning.",
         query_type=query_type,
         resolved_query=resolved_query,
-        tasks=tasks if tasks is not None else [RetrievalTask(query="NVDA revenue 2024")],
+        tasks=tasks if tasks is not None else [RetrievalTask(keyword_query="NVDA revenue 2024", semantic_query="What was NVIDIA's revenue in FY2024?")],
     )
 
 
@@ -275,7 +275,7 @@ def test_all_tickers_missing_returns_canned_answer():
             reasoning="Single company lookup.",
             query_type="single",
             resolved_query="What was FAKE's revenue?",
-            tasks=[RetrievalTask(query="FAKE revenue", filter=MetadataFilter(ticker="FAKE"))],
+            tasks=[RetrievalTask(keyword_query="FAKE revenue", semantic_query="What was FAKE's revenue?", filter=MetadataFilter(ticker="FAKE"))],
         ),
         usage=_usage(),
     )
@@ -390,7 +390,7 @@ def test_reflection_low_quality_triggers_extra_retrieval():
                     parsed=ReflectionDecision(
                         quality="low",
                         reason="missing gross margin",
-                        next_task=RetrievalTask(query="NVDA gross margin 2024"),
+                        next_task=RetrievalTask(keyword_query="NVDA gross margin 2024", semantic_query="What was NVIDIA's gross margin in FY2024?"),
                     ),
                     usage=_usage(),
                 )
@@ -429,8 +429,8 @@ def test_comparison_query_fans_out_to_parallel_retrieves():
                     query_type="comparison",
                     resolved_query="Compare NVDA and AMD revenue",
                     tasks=[
-                        RetrievalTask(query="revenue annual", filter=MetadataFilter(ticker="NVDA")),
-                        RetrievalTask(query="revenue annual", filter=MetadataFilter(ticker="AMD")),
+                        RetrievalTask(keyword_query="revenue annual", semantic_query="What was NVIDIA's annual revenue?", filter=MetadataFilter(ticker="NVDA")),
+                        RetrievalTask(keyword_query="revenue annual", semantic_query="What was AMD's annual revenue?", filter=MetadataFilter(ticker="AMD")),
                     ],
                 ),
                 usage=_usage(),
@@ -482,7 +482,7 @@ def test_hop_enabled_triggers_extra_retrieval():
                 return StructuredResponse(
                     parsed=HopDecision(
                         done=False,
-                        next_task=RetrievalTask(query="NVDA data center segment revenue"),
+                        next_task=RetrievalTask(keyword_query="NVDA data center segment revenue", semantic_query="What was NVIDIA's data center segment revenue?"),
                     ),
                     usage=_usage(),
                 )
@@ -564,7 +564,7 @@ def test_reflection_exhausted_terminates_after_max_iterations():
                 parsed=ReflectionDecision(
                     quality="low",
                     reason="still incomplete",
-                    next_task=RetrievalTask(query="more data"),
+                    next_task=RetrievalTask(keyword_query="more data", semantic_query="What is the additional data needed?"),
                 ),
                 usage=_usage(),
             )

@@ -133,7 +133,7 @@ def _make_query_plan(query_type="single", tasks=None) -> QueryPlan:
         reasoning="Test reasoning.",
         query_type=query_type,
         resolved_query="What was NVDA's revenue in 2024?",
-        tasks=tasks if tasks is not None else [RetrievalTask(query="NVDA revenue 2024")],
+        tasks=tasks if tasks is not None else [RetrievalTask(keyword_query="NVDA revenue 2024", semantic_query="What was NVIDIA's revenue in FY2024?")],
     )
 
 
@@ -188,7 +188,6 @@ def test_analyze_query_includes_history_in_user_message():
 
 
 def test_analyze_query_out_of_scope_sets_canned_answer():
-    plan = _make_query_plan(query_type="out_of_scope", tasks=[])
     plan = QueryPlan(
         reasoning="Not answerable from 10-K filings.",
         query_type="out_of_scope",
@@ -226,7 +225,7 @@ def test_analyze_query_all_tickers_missing_returns_canned_answer():
         reasoning="Single company lookup.",
         query_type="single",
         resolved_query="What was FAKE's revenue?",
-        tasks=[RetrievalTask(query="FAKE revenue", filter=MetadataFilter(ticker="FAKE"))],
+        tasks=[RetrievalTask(keyword_query="FAKE revenue", semantic_query="What was FAKE's revenue?", filter=MetadataFilter(ticker="FAKE"))],
     )
     llm = _make_llm(structured_return=StructuredResponse(parsed=plan, usage=_make_usage()))
 
@@ -245,8 +244,8 @@ def test_analyze_query_partial_ticker_missing_returns_canned_answer():
         query_type="comparison",
         resolved_query="Compare NVDA and AMD revenue.",
         tasks=[
-            RetrievalTask(query="revenue net sales", filter=MetadataFilter(ticker="NVDA")),
-            RetrievalTask(query="revenue net sales", filter=MetadataFilter(ticker="AMD")),
+            RetrievalTask(keyword_query="revenue net sales", semantic_query="What was NVIDIA's revenue?", filter=MetadataFilter(ticker="NVDA")),
+            RetrievalTask(keyword_query="revenue net sales", semantic_query="What was AMD's revenue?", filter=MetadataFilter(ticker="AMD")),
         ],
     )
     llm = _make_llm(structured_return=StructuredResponse(parsed=plan, usage=_make_usage()))
@@ -262,7 +261,7 @@ def test_analyze_query_partial_ticker_missing_returns_canned_answer():
 
 
 def test_analyze_query_returns_pending_tasks_on_success():
-    task = RetrievalTask(query="NVDA revenue 2024", filter=MetadataFilter(ticker="NVDA"))
+    task = RetrievalTask(keyword_query="NVDA revenue 2024", semantic_query="What was NVIDIA's revenue in FY2024?", filter=MetadataFilter(ticker="NVDA"))
     plan = _make_query_plan(tasks=[task])
     llm = _make_llm(structured_return=StructuredResponse(parsed=plan, usage=_make_usage()))
 
@@ -270,7 +269,7 @@ def test_analyze_query_returns_pending_tasks_on_success():
     result = node(_base_state())
 
     assert len(result["pending_tasks"]) == 1
-    assert result["pending_tasks"][0].query == "NVDA revenue 2024"
+    assert result["pending_tasks"][0].keyword_query == "NVDA revenue 2024"
 
 
 # ---------------------------------------------------------------------------
@@ -279,7 +278,7 @@ def test_analyze_query_returns_pending_tasks_on_success():
 
 def test_hyde_expand_populates_hyde_query_on_each_task():
     llm = _make_llm(chat_return=LLMResponse(content="Hypothetical passage.", usage=_make_usage()))
-    task = RetrievalTask(query="NVDA revenue 2024")
+    task = RetrievalTask(keyword_query="NVDA revenue 2024", semantic_query="What was NVIDIA's revenue in FY2024?")
 
     node = make_hyde_expand(llm, "Write a hypothetical passage.")
     result = node(_base_state(pending_tasks=[task]))
@@ -288,23 +287,26 @@ def test_hyde_expand_populates_hyde_query_on_each_task():
     assert result["pending_tasks"][0].hyde_query == "Hypothetical passage."
 
 
-def test_hyde_expand_sends_task_query_as_user_message():
+def test_hyde_expand_sends_semantic_query_as_user_message():
     llm = _make_llm(chat_return=LLMResponse(content="passage", usage=_make_usage()))
-    task = RetrievalTask(query="total revenues net sales fiscal year")
+    task = RetrievalTask(
+        keyword_query="total revenues net sales fiscal year",
+        semantic_query="What was NVIDIA's total revenue for fiscal year 2024?",
+    )
 
     node = make_hyde_expand(llm, "Write a hypothetical passage.")
     node(_base_state(pending_tasks=[task]))
 
     messages = llm.chat.call_args[0][0]
     assert messages[-1].role == "user"
-    assert "total revenues net sales" in messages[-1].content
+    assert "What was NVIDIA's total revenue" in messages[-1].content
 
 
 def test_hyde_expand_runs_once_per_task():
     llm = _make_llm(chat_return=LLMResponse(content="passage", usage=_make_usage()))
     tasks = [
-        RetrievalTask(query="NVDA revenue", filter=MetadataFilter(ticker="NVDA")),
-        RetrievalTask(query="AMD revenue", filter=MetadataFilter(ticker="AMD")),
+        RetrievalTask(keyword_query="NVDA revenue", semantic_query="What was NVIDIA's revenue?", filter=MetadataFilter(ticker="NVDA")),
+        RetrievalTask(keyword_query="AMD revenue", semantic_query="What was AMD's revenue?", filter=MetadataFilter(ticker="AMD")),
     ]
 
     node = make_hyde_expand(llm, "Write a hypothetical passage.")
@@ -327,11 +329,10 @@ def test_hyde_expand_preserves_task_order():
     llm = MagicMock()
     llm.chat.side_effect = chat_side_effect
 
-    tasks = [RetrievalTask(query=f"query {i}") for i in range(3)]
+    tasks = [RetrievalTask(keyword_query=f"query {i}", semantic_query=f"What is query {i}?") for i in range(3)]
     node = make_hyde_expand(llm, "Write a hypothetical passage.")
     result = node(_base_state(pending_tasks=tasks))
 
-    # Order must be preserved even though tasks run in parallel
     passages = [t.hyde_query for t in result["pending_tasks"]]
     assert set(passages) == {"passage A", "passage B", "passage C"}
     assert len(passages) == 3
@@ -349,7 +350,7 @@ def test_retrieve_returns_results_wrapped_in_list():
     embedder.embed.return_value = [[0.1] * 1024]
 
     node = make_retrieve(retriever, embedder)
-    output = node({"task": RetrievalTask(query="NVDA revenue")})
+    output = node({"task": RetrievalTask(keyword_query="NVDA revenue", semantic_query="What was NVIDIA's revenue?")})
 
     assert output["completed_results"] == [[result]]
 
@@ -360,7 +361,7 @@ def test_retrieve_uses_task_hyde_query_for_embedding_when_present():
     embedder = MagicMock()
     embedder.embed.return_value = [[0.1] * 1024]
 
-    task = RetrievalTask(query="NVDA revenue", hyde_query="Hypothetical passage")
+    task = RetrievalTask(keyword_query="NVDA revenue", semantic_query="What was NVIDIA's revenue?", hyde_query="Hypothetical passage")
     node = make_retrieve(retriever, embedder)
     node({"task": task})
 
@@ -368,17 +369,17 @@ def test_retrieve_uses_task_hyde_query_for_embedding_when_present():
     assert embedded_text == "Hypothetical passage"
 
 
-def test_retrieve_uses_task_query_for_embedding_when_no_hyde():
+def test_retrieve_uses_semantic_query_for_embedding_when_no_hyde():
     retriever = MagicMock()
     retriever.retrieve.return_value = []
     embedder = MagicMock()
     embedder.embed.return_value = [[0.1] * 1024]
 
     node = make_retrieve(retriever, embedder)
-    node({"task": RetrievalTask(query="NVDA revenue")})
+    node({"task": RetrievalTask(keyword_query="NVDA revenue", semantic_query="What was NVIDIA's revenue?")})
 
     embedded_text = embedder.embed.call_args[0][0][0]
-    assert embedded_text == "NVDA revenue"
+    assert embedded_text == "What was NVIDIA's revenue?"
 
 
 def test_retrieve_passes_filter_to_retriever():
@@ -389,7 +390,7 @@ def test_retrieve_passes_filter_to_retriever():
 
     f = MetadataFilter(ticker="NVDA")
     node = make_retrieve(retriever, embedder)
-    node({"task": RetrievalTask(query="revenue", filter=f)})
+    node({"task": RetrievalTask(keyword_query="revenue", semantic_query="What was the revenue?", filter=f)})
 
     assert retriever.retrieve.call_args[1]["filters"] == f
 
@@ -521,7 +522,7 @@ def test_check_hop_returns_empty_tasks_when_done():
 
 
 def test_check_hop_returns_next_task_when_not_done():
-    next_task = RetrievalTask(query="follow-up query")
+    next_task = RetrievalTask(keyword_query="follow-up query", semantic_query="What is the follow-up information?")
     decision = HopDecision(done=False, next_task=next_task)
     llm = _make_llm(structured_return=StructuredResponse(parsed=decision, usage=_make_usage()))
     result = _make_retrieval_result()
@@ -530,7 +531,7 @@ def test_check_hop_returns_next_task_when_not_done():
     output = node(_base_state(completed_results=[[result]], hop_count=0))
 
     assert len(output["pending_tasks"]) == 1
-    assert output["pending_tasks"][0].query == "follow-up query"
+    assert output["pending_tasks"][0].keyword_query == "follow-up query"
 
 
 def test_check_hop_returns_empty_tasks_when_not_done_but_next_task_is_none():
@@ -563,7 +564,7 @@ def test_reflect_returns_empty_tasks_on_high_quality():
 
 
 def test_reflect_returns_next_task_on_low_quality():
-    next_task = RetrievalTask(query="missing data")
+    next_task = RetrievalTask(keyword_query="missing data", semantic_query="What is the missing data?")
     decision = ReflectionDecision(quality="low", reason="revenue figure missing", next_task=next_task)
     llm = _make_llm(structured_return=StructuredResponse(parsed=decision, usage=_make_usage()))
     result = _make_retrieval_result()
@@ -573,7 +574,7 @@ def test_reflect_returns_next_task_on_low_quality():
     output = node(_base_state(completed_results=[[result]], answer=answer, reflection_count=0))
 
     assert len(output["pending_tasks"]) == 1
-    assert output["pending_tasks"][0].query == "missing data"
+    assert output["pending_tasks"][0].keyword_query == "missing data"
 
 
 def test_reflect_returns_empty_tasks_when_low_quality_but_no_next_task():

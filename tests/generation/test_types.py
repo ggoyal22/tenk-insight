@@ -29,29 +29,30 @@ from retrieval.types import MetadataFilter
 
 def test_retrieval_task_accepts_filter():
     f = MetadataFilter(ticker="NVDA", form_type="10-K")
-    task = RetrievalTask(query="NVDA revenue", filter=f)
-    assert task.query == "NVDA revenue"
+    task = RetrievalTask(keyword_query="NVDA revenue", semantic_query="What was NVIDIA's revenue?", filter=f)
+    assert task.keyword_query == "NVDA revenue"
     assert task.filter.ticker == "NVDA"
 
 
 def test_retrieval_task_filter_defaults_to_none():
-    task = RetrievalTask(query="some query")
+    task = RetrievalTask(keyword_query="some query", semantic_query="What is some query?")
     assert task.filter is None
 
 
 def test_retrieval_task_hyde_query_defaults_to_none():
-    task = RetrievalTask(query="some query")
+    task = RetrievalTask(keyword_query="some query", semantic_query="What is some query?")
     assert task.hyde_query is None
 
 
 def test_retrieval_task_accepts_hyde_query():
-    task = RetrievalTask(query="some query", hyde_query="Hypothetical passage.")
+    task = RetrievalTask(keyword_query="some query", semantic_query="What is some query?", hyde_query="Hypothetical passage.")
     assert task.hyde_query == "Hypothetical passage."
 
 
 def test_retrieval_task_has_json_schema():
     schema = RetrievalTask.model_json_schema()
-    assert "query" in schema["properties"]
+    assert "keyword_query" in schema["properties"]
+    assert "semantic_query" in schema["properties"]
 
 
 # ---------------------------------------------------------------------------
@@ -59,7 +60,7 @@ def test_retrieval_task_has_json_schema():
 # ---------------------------------------------------------------------------
 
 def test_query_plan_single():
-    task = RetrievalTask(query="NVDA revenue 2024")
+    task = RetrievalTask(keyword_query="NVDA revenue 2024", semantic_query="What was NVIDIA's revenue in FY2024?")
     plan = QueryPlan(
         reasoning="Single company metric lookup.",
         query_type="single",
@@ -76,8 +77,8 @@ def test_query_plan_comparison():
         query_type="comparison",
         resolved_query="Compare NVDA and AMD revenue.",
         tasks=[
-            RetrievalTask(query="revenue net sales", filter=MetadataFilter(ticker="NVDA")),
-            RetrievalTask(query="revenue net sales", filter=MetadataFilter(ticker="AMD")),
+            RetrievalTask(keyword_query="revenue net sales", semantic_query="What was NVIDIA's revenue?", filter=MetadataFilter(ticker="NVDA")),
+            RetrievalTask(keyword_query="revenue net sales", semantic_query="What was AMD's revenue?", filter=MetadataFilter(ticker="AMD")),
         ],
     )
     assert plan.query_type == "comparison"
@@ -135,10 +136,10 @@ def test_hop_decision_done():
 
 
 def test_hop_decision_not_done_with_task():
-    task = RetrievalTask(query="follow-up query")
+    task = RetrievalTask(keyword_query="follow-up query", semantic_query="What is the follow-up information?")
     hd = HopDecision(done=False, next_task=task)
     assert hd.done is False
-    assert hd.next_task.query == "follow-up query"
+    assert hd.next_task.keyword_query == "follow-up query"
 
 
 def test_hop_decision_has_json_schema():
@@ -157,10 +158,10 @@ def test_reflection_decision_high_quality():
 
 
 def test_reflection_decision_low_quality_with_task():
-    task = RetrievalTask(query="missing revenue data")
+    task = RetrievalTask(keyword_query="missing revenue data", semantic_query="What is the missing revenue figure?")
     rd = ReflectionDecision(quality="low", reason="revenue figure not in context", next_task=task)
     assert rd.quality == "low"
-    assert rd.next_task.query == "missing revenue data"
+    assert rd.next_task.keyword_query == "missing revenue data"
 
 
 def test_reflection_decision_rejects_invalid_quality():

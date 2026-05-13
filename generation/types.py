@@ -15,7 +15,8 @@ from retrieval.types import MetadataFilter, RetrievalResult
 
 class RetrievalTask(BaseModel):
     """A single retrieval request: a search query plus optional metadata filters."""
-    query: str
+    keyword_query: str
+    semantic_query: str
     filter: MetadataFilter | None = None
     hyde_query: str | None = None
 

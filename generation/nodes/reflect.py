@@ -40,7 +40,7 @@ def make_reflect(llm: BaseLLM, config: GenerationConfig, prompt: str) -> Callabl
             logger.warning(
                 "Reflection quality=low reason=%r next_task=%r reflection_count=%d.",
                 decision.reason,
-                decision.next_task.query if decision.next_task else None,
+                decision.next_task.keyword_query if decision.next_task else None,
                 state["reflection_count"] + 1,
             )
         else:
