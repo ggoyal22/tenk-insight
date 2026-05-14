@@ -63,6 +63,15 @@ class PostgresChunksRepository(ChunksRepo, PostgresRepository[ChunkRecord]):
         params_list = [self._model_to_params(r) for r in records]
         self._execute_many(sql, params_list, tx=tx)
 
+    def get_by_ids_no_embedding(self, ids: list[UUID]) -> list[ChunkRecord]:
+        if not ids:
+            return []
+        cols = [c for c in self._columns if c != "embedding"]
+        col_clause = ", ".join(cols)
+        sql = f"SELECT {col_clause} FROM {self._table} WHERE id = ANY(%s::uuid[])"
+        rows = self._execute_returning(sql, ([str(i) for i in ids],))
+        return [self._row_to_model(row, cols) for row in rows]
+
     # ── Keyword search (FTS implementation) ──────────────────────────────────
     # Uses PostgreSQL tsvector/tsquery. A future Pg_bm25ChunksRepository would
     # subclass this and override keyword_search with pg_bm25 SQL.

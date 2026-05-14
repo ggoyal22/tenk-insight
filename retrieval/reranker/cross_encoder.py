@@ -44,6 +44,6 @@ class CrossEncoderReranker(BaseReranker):
         ranked = sorted(zip(unique_results, scores), key=lambda x: x[1], reverse=True)
 
         return [
-            dataclasses.replace(result, score=float(score))
+            dataclasses.replace(result, reranker_score=float(score))
             for result, score in ranked[:top_k]
         ]

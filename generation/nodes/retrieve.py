@@ -38,11 +38,12 @@ def make_retrieve(retriever: Retriever, embedder: Embedder) -> Callable[[Retriev
         # they propagate up and surface as a clear graph-level failure rather than
         # silently degrading to keyword-only retrieval.
         query_to_embed = hyde_query if hyde_query else task.semantic_query
-        embedding = embedder.embed([query_to_embed])[0]
+        semantic_embedding = embedder.embed([query_to_embed])[0]
 
         results = retriever.retrieve(
-            query=task.keyword_query,
-            query_embedding=embedding,
+            keyword_query=task.keyword_query,
+            semantic_embedding=semantic_embedding,
+            rerank_query=task.semantic_query,
             filters=task.filter,
         )
 

@@ -15,8 +15,9 @@ class MetadataFilter:
 @dataclass
 class RetrievalResult:
     score: float
+    vector_score: float | None
+    keyword_score: float | None
+    reranker_score: float | None
     chunk: ChunkRecord
     parent_chunk: ParentChunkRecord
     filing: FilingRecord
-    vector_score: float | None = None
-    keyword_score: float | None = None

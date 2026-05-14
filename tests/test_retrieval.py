@@ -101,7 +101,7 @@ def _make_repos(chunk_id: UUID, parent_id: UUID, filing_id: UUID):
     chunk = _chunk_record(chunk_id, filing_id, parent_id)
 
     chunks_repo = MagicMock()
-    chunks_repo.get_by_ids.return_value = [chunk]
+    chunks_repo.get_by_ids_no_embedding.return_value = [chunk]
 
     parents_repo = MagicMock()
     parents_repo.get_by_ids.return_value = [parent]
@@ -135,7 +135,7 @@ class TestRetrieverModes:
             vector_retriever=vector_retriever,
             keyword_retriever=None,
         )
-        results = retriever.retrieve(query="GPU", query_embedding=[0.1] * 8)
+        results = retriever.retrieve(keyword_query="GPU", semantic_embedding=[0.1] * 8)
 
         vector_retriever.search.assert_called_once()
         assert len(results) == 1
@@ -162,24 +162,25 @@ class TestRetrieverModes:
             vector_retriever=None,
             keyword_retriever=keyword_retriever,
         )
-        results = retriever.retrieve(query="GPU", query_embedding=[0.1] * 8)
+        results = retriever.retrieve(keyword_query="GPU", semantic_embedding=[0.1] * 8)
 
         keyword_retriever.search.assert_called_once()
         assert len(results) == 1
         assert results[0].chunk.id == chunk_id
 
     def test_results_trimmed_to_final_top_k_when_reranker_disabled(self):
-        # Insert 3 chunks, set final_top_k=2 — result must be capped at 2
+        # 3 chunks each with a distinct parent — dedup keeps all 3, final_top_k=2 caps at 2
         ids = [uuid4() for _ in range(3)]
-        filing_id, parent_id = uuid4(), uuid4()
+        filing_id = uuid4()
+        parent_ids = [uuid4() for _ in range(3)]
         filing = _filing_record(filing_id)
-        parent = _parent_record(parent_id, filing_id)
-        chunks = [_chunk_record(cid, filing_id, parent_id) for cid in ids]
+        parents = [_parent_record(pid, filing_id) for pid in parent_ids]
+        chunks = [_chunk_record(cid, filing_id, pid) for cid, pid in zip(ids, parent_ids)]
 
         chunks_repo = MagicMock()
-        chunks_repo.get_by_ids.return_value = chunks
+        chunks_repo.get_by_ids_no_embedding.return_value = chunks
         parents_repo = MagicMock()
-        parents_repo.get_by_ids.return_value = [parent]
+        parents_repo.get_by_ids.return_value = parents
         filings_repo = MagicMock()
         filings_repo.get_by_ids.return_value = [filing]
         filings_repo.list_ids.return_value = None
@@ -200,7 +201,7 @@ class TestRetrieverModes:
             chunks_repo=chunks_repo, parent_chunks_repo=parents_repo, filings_repo=filings_repo,
             vector_retriever=vector_retriever,
         )
-        results = retriever.retrieve(query="GPU", query_embedding=[0.1] * 8)
+        results = retriever.retrieve(keyword_query="GPU", semantic_embedding=[0.1] * 8)
 
         assert len(results) == 2
 
@@ -213,10 +214,13 @@ class TestCrossEncoderReranker:
         filing = _filing_record(filing_id)
         parent = _parent_record(parent_id, filing_id)
         chunk = _chunk_record(uuid4(), filing_id, parent_id)
-        return RetrievalResult(score=0.5, chunk=chunk, parent_chunk=parent, filing=filing)
+        return RetrievalResult(
+            score=0.5, vector_score=None, keyword_score=None, reranker_score=None,
+            chunk=chunk, parent_chunk=parent, filing=filing,
+        )
 
     @patch("retrieval.reranker.cross_encoder.CrossEncoder")
-    def test_rerank_sorts_by_score_descending(self, MockCE):
+    def test_rerank_sorts_by_reranker_score_descending(self, MockCE):
         mock_model = MagicMock()
         mock_model.predict.return_value.tolist.return_value = [0.3, 0.9, 0.6]
         MockCE.return_value = mock_model
@@ -225,11 +229,26 @@ class TestCrossEncoderReranker:
         results = [self._make_result(uuid4()) for _ in range(3)]
         ranked = reranker.rerank("test query", results, top_k=3)
 
-        scores = [r.score for r in ranked]
-        assert scores == sorted(scores, reverse=True)
+        reranker_scores = [r.reranker_score for r in ranked]
+        assert reranker_scores == sorted(reranker_scores, reverse=True)
 
     @patch("retrieval.reranker.cross_encoder.CrossEncoder")
-    def test_rerank_deduplicates_by_parent_chunk_id(self, MockCE):
+    def test_rerank_sets_reranker_score_and_preserves_rrf_score(self, MockCE):
+        mock_model = MagicMock()
+        mock_model.predict.return_value.tolist.return_value = [0.8]
+        MockCE.return_value = mock_model
+
+        reranker = CrossEncoderReranker("mock-model")
+        result = self._make_result(uuid4())
+        original_rrf_score = result.score
+
+        ranked = reranker.rerank("test query", [result], top_k=1)
+
+        assert ranked[0].reranker_score == 0.8
+        assert ranked[0].score == original_rrf_score
+
+    @patch("retrieval.reranker.cross_encoder.CrossEncoder")
+    def test_rerank_skips_duplicate_parent_inference(self, MockCE):
         mock_model = MagicMock()
         mock_model.predict.return_value.tolist.return_value = [0.8]
         MockCE.return_value = mock_model

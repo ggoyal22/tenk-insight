@@ -20,6 +20,14 @@ class ChunksRepo(RelationalRepository[ChunkRecord]):
     def insert_many(self, records: list[ChunkRecord], tx: Transaction | None = None) -> None: ...
 
     @abstractmethod
+    def get_by_ids_no_embedding(self, ids: list[UUID]) -> list[ChunkRecord]:
+        """Fetch chunks by ID, omitting the embedding column.
+
+        Use this in retrieval pipelines — embeddings are large and unused downstream.
+        """
+        ...
+
+    @abstractmethod
     def keyword_search(
         self,
         query: str,

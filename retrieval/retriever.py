@@ -37,9 +37,10 @@ class Retriever:
 
     def retrieve(
         self,
-        query: str,
-        query_embedding: list[float],
+        keyword_query: str,
+        semantic_embedding: list[float],
         filters: MetadataFilter | None = None,
+        rerank_query: str | None = None,
     ) -> list[RetrievalResult]:
         filing_ids = self._resolve_filing_ids(filters)
         section = filters.section if filters else None
@@ -50,7 +51,7 @@ class Retriever:
 
         if self._vector:
             vector_results = self._vector.search(
-                query_embedding=query_embedding,
+                query_embedding=semantic_embedding,
                 top_k=self._config.vector_search.oversample_k,
                 filing_ids=filing_ids,
                 section=section,
@@ -61,7 +62,7 @@ class Retriever:
 
         if self._keyword:
             keyword_results = self._keyword.search(
-                query=query,
+                query=keyword_query,
                 top_k=self._config.keyword_search.top_k,
                 filing_ids=filing_ids,
                 section=section,
@@ -80,7 +81,7 @@ class Retriever:
         results = self._enrich(fused, vector_scores, keyword_scores)
 
         if self._reranker and self._config.reranking.enabled:
-            return self._reranker.rerank(query, results, self._config.reranking.top_k)
+            return self._reranker.rerank(rerank_query or keyword_query, results, self._config.reranking.top_k)
 
         return results[: self._config.final_top_k]
 
@@ -119,7 +120,7 @@ class Retriever:
         chunk_ids = [cid for cid, _ in fused]
         score_map = {cid: score for cid, score in fused}
 
-        chunks = self._chunks.get_by_ids(chunk_ids)
+        chunks = self._chunks.get_by_ids_no_embedding(chunk_ids)
         chunk_map = {c.id: c for c in chunks}
 
         parent_ids = [c.parent_chunk_id for c in chunks]
@@ -128,6 +129,7 @@ class Retriever:
         filing_ids = list({c.filing_id for c in chunks})
         filing_map = {f.id: f for f in self._filings.get_by_ids(filing_ids)}
 
+        seen_parents: set[UUID] = set()
         results: list[RetrievalResult] = []
         for chunk_id in chunk_ids:
             chunk = chunk_map.get(chunk_id)
@@ -147,13 +149,18 @@ class Retriever:
                     "This indicates incomplete ingestion — re-run the ingestion pipeline."
                 )
 
+            if parent.id in seen_parents:
+                continue
+            seen_parents.add(parent.id)
+
             results.append(RetrievalResult(
                 score=score_map[chunk_id],
+                vector_score=vector_scores.get(chunk_id),
+                keyword_score=keyword_scores.get(chunk_id),
+                reranker_score=None,
                 chunk=chunk,
                 parent_chunk=parent,
                 filing=filing,
-                vector_score=vector_scores.get(chunk_id),
-                keyword_score=keyword_scores.get(chunk_id),
             ))
 
         return results

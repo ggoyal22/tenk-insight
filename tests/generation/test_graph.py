@@ -57,7 +57,10 @@ def _make_retrieval_result(ticker: str = "NVDA") -> RetrievalResult:
         text=f"{ticker} revenue $60B", token_count=5,
         content_hash="def", created_at=datetime(2024, 3, 1),
     )
-    return RetrievalResult(score=0.9, chunk=chunk, parent_chunk=parent, filing=filing)
+    return RetrievalResult(
+        score=0.9, vector_score=None, keyword_score=None, reranker_score=None,
+        chunk=chunk, parent_chunk=parent, filing=filing,
+    )
 
 
 def _make_embedder(dim: int = 1024) -> MagicMock:

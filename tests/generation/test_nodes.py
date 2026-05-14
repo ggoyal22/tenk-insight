@@ -102,7 +102,10 @@ def _make_retrieval_result() -> RetrievalResult:
     filing = _make_filing()
     parent = _make_parent_chunk(filing.id)
     chunk = _make_chunk(filing.id, parent.id)
-    return RetrievalResult(score=0.9, chunk=chunk, parent_chunk=parent, filing=filing)
+    return RetrievalResult(
+        score=0.9, vector_score=None, keyword_score=None, reranker_score=None,
+        chunk=chunk, parent_chunk=parent, filing=filing,
+    )
 
 
 def _base_state(**overrides) -> dict:
@@ -450,11 +453,13 @@ def test_generate_orders_high_frequency_chunks_first_in_context():
         created_at=datetime(2024, 3, 1),
     )
     high_freq_result = RetrievalResult(
-        score=0.9, chunk=_make_chunk(filing.id, high_freq_parent.id),
+        score=0.9, vector_score=None, keyword_score=None, reranker_score=None,
+        chunk=_make_chunk(filing.id, high_freq_parent.id),
         parent_chunk=high_freq_parent, filing=filing,
     )
     low_freq_result = RetrievalResult(
-        score=0.9, chunk=_make_chunk(filing.id, low_freq_parent.id),
+        score=0.9, vector_score=None, keyword_score=None, reranker_score=None,
+        chunk=_make_chunk(filing.id, low_freq_parent.id),
         parent_chunk=low_freq_parent, filing=filing,
     )
 
@@ -473,8 +478,14 @@ def test_generate_filters_citations_to_cited_indices():
         text="Competition is intense.", token_count=3, content_hash="c" * 64,
         created_at=datetime(2024, 3, 1),
     )
-    result1 = RetrievalResult(score=0.9, chunk=_make_chunk(filing.id, parent1.id), parent_chunk=parent1, filing=filing)
-    result2 = RetrievalResult(score=0.8, chunk=_make_chunk(filing.id, parent2.id), parent_chunk=parent2, filing=filing)
+    result1 = RetrievalResult(
+        score=0.9, vector_score=None, keyword_score=None, reranker_score=None,
+        chunk=_make_chunk(filing.id, parent1.id), parent_chunk=parent1, filing=filing,
+    )
+    result2 = RetrievalResult(
+        score=0.8, vector_score=None, keyword_score=None, reranker_score=None,
+        chunk=_make_chunk(filing.id, parent2.id), parent_chunk=parent2, filing=filing,
+    )
 
     llm = _make_llm(structured_return=_make_gen_response("Revenue was $60.9B [1].", [1]))
     node = make_generate(llm, "Answer the question.", "Compare the companies.")
