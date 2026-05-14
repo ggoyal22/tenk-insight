@@ -81,11 +81,13 @@ def test_empty_samples_returns_empty_evaluation_result():
 
 def _patch_ragas(mock_scores: dict):
     """Context manager that stubs out RAGAS internals for unit tests."""
+    async def _async_scores(scores):
+        return scores
+
     def make_metric_class(name):
+        scores = [MagicMock(value=s) for s in mock_scores.get(name, [])]
         instance = MagicMock()
-        instance.batch_score.return_value = [
-            MagicMock(value=s) for s in mock_scores.get(name, [])
-        ]
+        instance.abatch_score = MagicMock(return_value=_async_scores(scores))
         return MagicMock(return_value=instance)
 
     mock_registry = {k: make_metric_class(k) for k in _METRIC_REGISTRY}
@@ -176,4 +178,6 @@ def test_build_llm_passes_api_key():
     with patch("evaluation.evaluators.ragas.AsyncOpenAI") as mock_openai, \
          patch("evaluation.evaluators.ragas.llm_factory"):
         evaluator._build_llm()
-        mock_openai.assert_called_once_with(api_key="sk-test")
+        call_kwargs = mock_openai.call_args.kwargs
+        assert call_kwargs["api_key"] == "sk-test"
+        assert "http_client" in call_kwargs

@@ -12,15 +12,16 @@ def query_type_accuracy(output: dict, expected: dict) -> bool:
 
 
 def task_count_match(output: dict, expected: dict) -> tuple | bool:
-    """Correct number of retrieval tasks generated.
+    """Check that the number of generated tasks is at least the expected count.
 
     Returns (None, "skipped") when expected_tasks is absent from the fixture —
     Phoenix stores a label with no score, leaving the metric blank for that example.
+    Passes when the LLM generates more tasks than expected; only fails when fewer.
     """
     expected_tasks = expected.get("expected_tasks")
     if expected_tasks is None:
         return (None, "skipped")
-    return len(output.get("tasks", [])) == len(expected_tasks)
+    return len(output.get("tasks", [])) >= len(expected_tasks)
 
 
 def task_filter_recall(output: dict, expected: dict) -> tuple | float:

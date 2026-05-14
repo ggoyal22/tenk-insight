@@ -191,7 +191,8 @@ def _print_mismatches(ran, dataset) -> None:
     c4 = max(len("Got"), max(len(r[3]) for r in rows))
     sep = f"  {'─' * c1}  {'─' * c2}  {'─' * c3}  {'─' * c4}"
 
-    print(f"\nMismatches ({len(rows)} of {total})")
+    unique_queries = len({r[1] for r in rows})
+    print(f"\nMismatches ({unique_queries} of {total} example(s), {len(rows)} metric failure(s))")
     print(sep)
     print(f"  {'Metric':<{c1}}  {'Query':<{c2}}  {'Expected':<{c3}}  {'Got':<{c4}}")
     print(sep)
@@ -203,7 +204,8 @@ def _print_mismatches(ran, dataset) -> None:
 def _serialise_tasks(tasks: list) -> list[dict]:
     return [
         {
-            "query": t.query,
+            "keyword_query": t.keyword_query,
+            "semantic_query": t.semantic_query,
             "filter": dataclasses.asdict(t.filter) if t.filter else None,
         }
         for t in tasks
