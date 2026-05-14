@@ -25,7 +25,7 @@ openinference-instrumentation-langchain~=0.1    # auto-instruments LangGraph nod
 openinference-semantic-conventions~=0.1         # semantic conventions for LLM span attributes
 
 # Evaluation
-ragas~=0.2                  # RAG evaluation metrics (faithfulness, answer_relevancy, context_precision, context_recall)
+ragas~=0.4                  # RAG evaluation metrics (faithfulness, answer_relevancy, context_precision, context_recall)
 langchain-openai~=0.2       # LangChain OpenAI wrapper; required by RAGAS for judge LLM
 
 # UI

@@ -10,10 +10,12 @@ Reference-required metrics are silently dropped when no sample in the batch
 has a non-None reference, rather than raising an error.
 """
 
+import asyncio
 import logging
 import math
 from typing import Any
 
+import httpx
 from openai import AsyncOpenAI
 from ragas.embeddings.base import embedding_factory
 from ragas.llms import llm_factory
@@ -83,8 +85,27 @@ class RagasEvaluator(BaseEvaluator):
         embeddings = self._build_embeddings()
 
         per_sample: list[dict[str, float]] = [{} for _ in samples]
+        asyncio.run(self._score_all(active_metrics, samples, per_sample, llm, embeddings))
 
-        for name in active_metrics:
+        aggregate = {
+            name: _mean([s[name] for s in per_sample if name in s])
+            for name in active_metrics
+            if any(name in s for s in per_sample)
+        }
+
+        return EvaluationResult(scores=per_sample, aggregate=aggregate)
+
+    async def _score_all(
+        self,
+        active_metrics: list[str],
+        samples: list[EvalSample],
+        per_sample: list[dict[str, float]],
+        llm: Any,
+        embeddings: Any,
+    ) -> None:
+        async def _score_metric(name: str, delay: float = 0.0) -> None:
+            if delay:
+                await asyncio.sleep(delay)
             metric = (
                 _METRIC_REGISTRY[name](llm=llm, embeddings=embeddings)
                 if name == "answer_relevancy"
@@ -107,10 +128,10 @@ class RagasEvaluator(BaseEvaluator):
                 scorable = list(enumerate(samples))
 
             if not scorable:
-                continue
+                return
 
             inputs = [_sample_to_kwargs(s, _METRIC_KWARGS[name]) for _, s in scorable]
-            results = metric.batch_score(inputs)
+            results = await metric.abatch_score(inputs)
             for (i, _), res in zip(scorable, results):
                 try:
                     v = float(res.value)
@@ -119,19 +140,21 @@ class RagasEvaluator(BaseEvaluator):
                 except (TypeError, ValueError):
                     pass
 
-        aggregate = {
-            name: _mean([s[name] for s in per_sample if name in s])
-            for name in active_metrics
-            if any(name in s for s in per_sample)
-        }
-
-        return EvaluationResult(scores=per_sample, aggregate=aggregate)
+        await asyncio.gather(*[
+            _score_metric(name, delay=i * 0.5)
+            for i, name in enumerate(active_metrics)
+        ])
 
     def _build_llm(self) -> Any:
         cfg = self._judge_llm_config
         if cfg.provider == "openai":
             api_key = cfg.api_key.get_secret_value() if cfg.api_key else None
-            self._openai_client = AsyncOpenAI(api_key=api_key)
+            self._openai_client = AsyncOpenAI(
+                api_key=api_key,
+                http_client=httpx.AsyncClient(
+                    limits=httpx.Limits(max_connections=20, max_keepalive_connections=20),
+                ),
+            )
             return llm_factory(cfg.model, provider="openai", client=self._openai_client)
         raise ValueError(f"Unsupported judge LLM provider: '{cfg.provider}'")
 

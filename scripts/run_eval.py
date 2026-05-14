@@ -1,9 +1,10 @@
 import logging
 import os
+import re
 import sqlite3
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import yaml
@@ -67,6 +68,16 @@ def _print_summary(result: RunResult) -> None:
     print()
 
 
+def _parse_since(value: str) -> datetime:
+    """Parse a duration string like '1h', '30m', '2h30m' into an absolute UTC datetime."""
+    match = re.fullmatch(r'(?:(\d+)h)?(?:(\d+)m)?', value)
+    if not match or not any(match.groups()):
+        raise ValueError(f"Invalid --since value '{value}'. Use e.g. '1h', '30m', '2h30m'.")
+    hours = int(match.group(1) or 0)
+    minutes = int(match.group(2) or 0)
+    return datetime.now(timezone.utc) - timedelta(hours=hours, minutes=minutes)
+
+
 def _wait_for_traces(db_path: str, since: datetime, timeout: int = 30) -> None:
     """Poll Phoenix DB until the generate-span count stops growing (stable for 2s).
 
@@ -98,6 +109,22 @@ def _wait_for_traces(db_path: str, since: datetime, timeout: int = 30) -> None:
 
 
 def main() -> None:
+    import argparse
+    parser = argparse.ArgumentParser(description="Run generation and/or RAGAS evaluation")
+    parser.add_argument(
+        "--eval-only", action="store_true",
+        help="Skip generation and evaluate existing traces in Phoenix",
+    )
+    parser.add_argument(
+        "--since", metavar="DURATION",
+        help="With --eval-only: limit to traces from the last duration (e.g. 1h, 30m, 2h30m)",
+    )
+    parser.add_argument(
+        "--debug-http", action="store_true",
+        help="Enable DEBUG logging for the OpenAI HTTP client (shows retry status codes)",
+    )
+    args = parser.parse_args()
+
     try:
         app_config = load_config()
         eval_config = load_eval_config()
@@ -110,6 +137,9 @@ def main() -> None:
         format="%(asctime)s %(levelname)s %(name)s — %(message)s",
         datefmt="%Y-%m-%dT%H:%M:%S",
     )
+    if args.debug_http:
+        logging.getLogger("openai").setLevel(logging.DEBUG)
+        logging.getLogger("httpx").setLevel(logging.DEBUG)
     logger = logging.getLogger(__name__)
 
     try:
@@ -118,44 +148,58 @@ def main() -> None:
         sys.stderr.write(f"CRITICAL — Failed to initialise tracing: {exc}\n")
         sys.exit(1)
 
-    queries = _load_queries(eval_config.golden_path, eval_config.datasets)
-    if not queries:
-        sys.stderr.write(
-            f"CRITICAL — No golden queries found for datasets {eval_config.datasets} "
-            f"in '{eval_config.golden_path}'\n"
-        )
-        sys.exit(1)
+    since: datetime | None
 
-    client = create_db_client(app_config)
-    if not client.health_check():
-        sys.stderr.write("CRITICAL — Database health check failed\n")
-        client.close()
-        sys.exit(1)
-
-    try:
-        embedder = create_embedder(app_config)
-        graph = build_generation_pipeline(app_config, client, embedder)
-
-        since = datetime.now(timezone.utc)
-        logger.info(
-            "Executing %d queries across datasets %s", len(queries), eval_config.datasets
-        )
-
-        for i, query in enumerate(queries, 1):
-            logger.info("[%d/%d] %s", i, len(queries), query)
+    if args.eval_only:
+        if args.since:
             try:
-                graph.invoke(make_initial_state(query))
-            except Exception:
-                logger.warning("Query failed, skipping: %s", query, exc_info=True)
+                since = _parse_since(args.since)
+            except ValueError as exc:
+                sys.stderr.write(f"CRITICAL — {exc}\n")
+                sys.exit(1)
+            logger.info("--eval-only: evaluating traces since %s", since.isoformat())
+        else:
+            since = None
+            logger.info("--eval-only: evaluating all traces in Phoenix")
+    else:
+        queries = _load_queries(eval_config.golden_path, eval_config.datasets)
+        if not queries:
+            sys.stderr.write(
+                f"CRITICAL — No golden queries found for datasets {eval_config.datasets} "
+                f"in '{eval_config.golden_path}'\n"
+            )
+            sys.exit(1)
 
-    except Exception:
-        logging.critical("Execution phase failed", exc_info=True)
-        sys.exit(1)
-    finally:
-        client.close()
+        client = create_db_client(app_config)
+        if not client.health_check():
+            sys.stderr.write("CRITICAL — Database health check failed\n")
+            client.close()
+            sys.exit(1)
 
-    flush_spans()
-    _wait_for_traces(os.environ.get("PHOENIX_DB_PATH", ""), since)
+        try:
+            embedder = create_embedder(app_config)
+            graph = build_generation_pipeline(app_config, client, embedder)
+
+            since = datetime.now(timezone.utc)
+            logger.info(
+                "Executing %d queries across datasets %s", len(queries), eval_config.datasets
+            )
+
+            for i, query in enumerate(queries, 1):
+                logger.info("[%d/%d] %s", i, len(queries), query)
+                try:
+                    graph.invoke(make_initial_state(query))
+                except Exception:
+                    logger.warning("Query failed, skipping: %s", query, exc_info=True)
+
+        except Exception:
+            logging.critical("Execution phase failed", exc_info=True)
+            sys.exit(1)
+        finally:
+            client.close()
+
+        flush_spans()
+        _wait_for_traces(os.environ.get("PHOENIX_DB_PATH", ""), since)
 
     golden = load_golden(eval_config.golden_path)
     runner = EvaluationRunner(
