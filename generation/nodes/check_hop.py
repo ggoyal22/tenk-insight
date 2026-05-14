@@ -28,6 +28,21 @@ def make_check_hop(llm: BaseLLM, config: GenerationConfig, prompt: str) -> Calla
                 ),
             ),
         ]
+        failed = state.get("failed_queries") or []
+        failed_section = (
+            "\n\nQueries already attempted that returned no results:\n"
+            + "\n".join(
+                f"- keyword: {t.keyword_query} | semantic: {t.semantic_query}"
+                + (f" | filter: {t.filter}" if t.filter else "")
+                for t in failed
+            )
+        ) if failed else ""
+
+        messages[-1] = Message(
+            role="user",
+            content=messages[-1].content + failed_section,
+        )
+
         response = llm.chat_structured(messages, HopDecision, max_tokens=MAX_TOKENS_CHECK_HOP)
         decision = response.parsed
 

@@ -98,6 +98,9 @@ class GenerationState(TypedDict):
     # Reducer appends each retrieve node's result list — preserves which results
     # came from which task so generate can build per-source citations.
     completed_results: Annotated[list[list[RetrievalResult]], operator.add]
+    # Tasks that returned zero chunks — accumulated so check_hop can avoid repeating them.
+    # hyde_query is stripped before appending (it's an embedding aid, not a search query).
+    failed_queries: Annotated[list[RetrievalTask], operator.add]
     # Reducer accumulates LLM usage across all nodes; generate sums it for the final total.
     pipeline_usage: Annotated[list[LLMUsage], operator.add]
     hop_count: int

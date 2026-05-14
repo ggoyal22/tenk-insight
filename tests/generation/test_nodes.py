@@ -117,6 +117,7 @@ def _base_state(**overrides) -> dict:
         "resolved_query": None,
         "pending_tasks": [],
         "completed_results": [],
+        "failed_queries": [],
         "hop_count": 0,
         "reflection_count": 0,
         "retrieval_triggered_by": "analysis",

@@ -178,6 +178,8 @@ When providing next_task:
 - semantic_query: one sentence natural language question for the specific missing information
 - filter: narrow as specifically as possible (ticker, fiscal_year); do not set section
 
+If the user message lists queries under "Queries already attempted that returned no results", do not repeat those keyword_query or semantic_query values. Either reformulate with different terminology or a broader/different filter, or return done: true if no meaningfully different query is possible.
+
 Default to done: true. Only request further retrieval if the gap is concrete and the missing information is likely to exist in a 10-K filing."""
 
 
