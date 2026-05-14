@@ -120,6 +120,10 @@ def main() -> None:
         help="With --eval-only: limit to traces from the last duration (e.g. 1h, 30m, 2h30m)",
     )
     parser.add_argument(
+        "--golden", metavar="PATH",
+        help="Path to a golden YAML file or directory (overrides eval.golden_path in config)",
+    )
+    parser.add_argument(
         "--debug-http", action="store_true",
         help="Enable DEBUG logging for the OpenAI HTTP client (shows retry status codes)",
     )
@@ -131,6 +135,9 @@ def main() -> None:
     except Exception as exc:
         sys.stderr.write(f"CRITICAL — Failed to load config: {exc}\n")
         sys.exit(1)
+
+    if args.golden:
+        eval_config.golden_path = args.golden
 
     logging.basicConfig(
         level=eval_config.log_level,
