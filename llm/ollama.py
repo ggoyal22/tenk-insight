@@ -30,12 +30,13 @@ class OllamaLLM(BaseLLM):
             "num_predict": config.max_tokens,
         }
 
-    def chat(self, messages: list[Message]) -> LLMResponse:
+    def chat(self, messages: list[Message], max_tokens: int | None = None) -> LLMResponse:
+        options = {**self._options, **({"num_predict": max_tokens} if max_tokens is not None else {})}
         try:
             response = self._client.chat(
                 model=self._model,
                 messages=[{"role": m.role, "content": m.content} for m in messages],
-                options=self._options,
+                options=options,
             )
         except OllamaResponseError as e:
             raise LLMError(str(e), _PROVIDER, self._model) from e
@@ -48,13 +49,14 @@ class OllamaLLM(BaseLLM):
             ),
         )
 
-    def chat_structured(self, messages: list[Message], schema: type[T]) -> StructuredResponse[T]:
+    def chat_structured(self, messages: list[Message], schema: type[T], max_tokens: int | None = None) -> StructuredResponse[T]:
+        options = {**self._options, **({"num_predict": max_tokens} if max_tokens is not None else {})}
         try:
             response = self._client.chat(
                 model=self._model,
                 messages=[{"role": m.role, "content": m.content} for m in messages],
                 format=schema.model_json_schema(),
-                options=self._options,
+                options=options,
             )
         except OllamaResponseError as e:
             raise LLMError(str(e), _PROVIDER, self._model) from e

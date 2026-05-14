@@ -62,12 +62,12 @@ class BaseLLM(ABC):
             cls.chat_structured = _trace_llm(cls.chat_structured)
 
     @abstractmethod
-    def chat(self, messages: list[Message]) -> LLMResponse:
+    def chat(self, messages: list[Message], max_tokens: int | None = None) -> LLMResponse:
         """Send a conversation and return the text response with token usage."""
         ...
 
     @abstractmethod
-    def chat_structured(self, messages: list[Message], schema: type[T]) -> StructuredResponse[T]:
+    def chat_structured(self, messages: list[Message], schema: type[T], max_tokens: int | None = None) -> StructuredResponse[T]:
         """Send a conversation and return a parsed Pydantic model with token usage.
 
         The provider is instructed to emit JSON conforming to schema's JSON Schema.

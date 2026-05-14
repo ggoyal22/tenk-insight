@@ -7,6 +7,7 @@ from generation.nodes._stream import get_writer
 from llm.base import BaseLLM
 from llm.types import Message
 from generation.nodes._context import build_context
+from generation.token_limits import MAX_TOKENS_GENERATE
 from generation.types import Citation, GenerationResponse, GenerationResult, GenerationState
 from retrieval.types import RetrievalResult
 
@@ -36,7 +37,7 @@ def make_generate(
             Message(role="user", content=f"Question: {state.get('resolved_query') or state['query']}\n\nContext:\n{context}"),
         ]
 
-        response = llm.chat_structured(messages, GenerationResponse)
+        response = llm.chat_structured(messages, GenerationResponse, max_tokens=MAX_TOKENS_GENERATE)
         cited_results = _filter_by_indices(results, response.parsed.cited_indices)
         citations = _build_citations(cited_results)
 

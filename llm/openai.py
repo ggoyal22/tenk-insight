@@ -33,12 +33,13 @@ class OpenAILLM(BaseLLM):
             "max_tokens": config.max_tokens,
         }
 
-    def chat(self, messages: list[Message]) -> LLMResponse:
+    def chat(self, messages: list[Message], max_tokens: int | None = None) -> LLMResponse:
+        params = {**self._params, **({"max_tokens": max_tokens} if max_tokens is not None else {})}
         try:
             response = self._client.chat.completions.create(
                 model=self._model,
                 messages=[{"role": m.role, "content": m.content} for m in messages],
-                **self._params,
+                **params,
             )
         except OpenAIError as e:
             raise LLMError(str(e), _PROVIDER, self._model) from e
@@ -51,13 +52,14 @@ class OpenAILLM(BaseLLM):
             ),
         )
 
-    def chat_structured(self, messages: list[Message], schema: type[T]) -> StructuredResponse[T]:
+    def chat_structured(self, messages: list[Message], schema: type[T], max_tokens: int | None = None) -> StructuredResponse[T]:
+        params = {**self._params, **({"max_tokens": max_tokens} if max_tokens is not None else {})}
         try:
             response = self._client.beta.chat.completions.parse(
                 model=self._model,
                 messages=[{"role": m.role, "content": m.content} for m in messages],
                 response_format=schema,
-                **self._params,
+                **params,
             )
         except OpenAIError as e:
             raise LLMError(str(e), _PROVIDER, self._model) from e

@@ -174,8 +174,8 @@ Return done: true if the context contains sufficient information to answer the q
 Return done: false with a next_task only if specific, identifiable information is clearly missing.
 
 When providing next_task:
-- keyword_query: space-separated financial terms targeting only the missing information — use financial statement language
-- semantic_query: natural language question for the specific missing information
+- keyword_query: 5–10 space-separated financial terms targeting only the missing information — use financial statement language
+- semantic_query: one sentence natural language question for the specific missing information
 - filter: narrow as specifically as possible (ticker, fiscal_year); do not set section
 
 Default to done: true. Only request further retrieval if the gap is concrete and the missing information is likely to exist in a 10-K filing."""
@@ -194,8 +194,8 @@ Return quality: "high" if both checks pass.
 Return quality: "low" if either fails, along with:
 - reason: a concise explanation of what is wrong
 - next_task: a retrieval task that would obtain the missing or unverified information
-  - keyword_query: space-separated financial terms targeting the specific gap
-  - semantic_query: natural language question for the specific gap
+  - keyword_query: 5–10 space-separated financial terms targeting the specific gap
+  - semantic_query: one sentence natural language question for the specific gap
   - filter: narrow as specifically as possible (ticker, fiscal_year) — do not set section
 
 Be strict but fair. Minor omissions are acceptable if the core question is answered and every stated fact is grounded in the context."""

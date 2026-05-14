@@ -125,7 +125,7 @@ def test_single_query_produces_answer():
     )
     llm = MagicMock()
 
-    def chat_structured_side_effect(messages, schema):
+    def chat_structured_side_effect(messages, schema, **kwargs):
         if schema == QueryPlan:
             return StructuredResponse(parsed=_make_query_plan(), usage=_usage())
         if schema == GenerationResponse:
@@ -157,7 +157,7 @@ def test_resolved_query_stored_in_state():
     )
     llm = MagicMock()
 
-    def chat_structured_side_effect(messages, schema):
+    def chat_structured_side_effect(messages, schema, **kwargs):
         if schema == QueryPlan:
             return StructuredResponse(
                 parsed=_make_query_plan(resolved_query="What was NVDA's revenue in FY2024?"),
@@ -307,7 +307,7 @@ def test_hyde_passage_is_used_for_embedding():
     )
     llm = MagicMock()
 
-    def chat_structured_side_effect(messages, schema):
+    def chat_structured_side_effect(messages, schema, **kwargs):
         if schema == QueryPlan:
             return StructuredResponse(parsed=_make_query_plan(), usage=_usage())
         if schema == GenerationResponse:
@@ -341,7 +341,7 @@ def test_reflection_high_quality_ends_pipeline():
     )
     llm = MagicMock()
 
-    def chat_structured_side_effect(messages, schema):
+    def chat_structured_side_effect(messages, schema, **kwargs):
         if schema == QueryPlan:
             return StructuredResponse(parsed=_make_query_plan(), usage=_usage())
         if schema == GenerationResponse:
@@ -378,7 +378,7 @@ def test_reflection_low_quality_triggers_extra_retrieval():
     reflection_calls = {"count": 0}
     llm = MagicMock()
 
-    def chat_structured_side_effect(messages, schema):
+    def chat_structured_side_effect(messages, schema, **kwargs):
         if schema == QueryPlan:
             return StructuredResponse(parsed=_make_query_plan(), usage=_usage())
         if schema == GenerationResponse:
@@ -425,7 +425,7 @@ def test_comparison_query_fans_out_to_parallel_retrieves():
     )
     llm = MagicMock()
 
-    def chat_structured_side_effect(messages, schema):
+    def chat_structured_side_effect(messages, schema, **kwargs):
         if schema == QueryPlan:
             return StructuredResponse(
                 parsed=_make_query_plan(
@@ -476,7 +476,7 @@ def test_hop_enabled_triggers_extra_retrieval():
     hop_calls = {"count": 0}
     llm = MagicMock()
 
-    def chat_structured_side_effect(messages, schema):
+    def chat_structured_side_effect(messages, schema, **kwargs):
         if schema == QueryPlan:
             return StructuredResponse(parsed=_make_query_plan(), usage=_usage())
         if schema == HopDecision:
@@ -518,7 +518,7 @@ def test_hop_disabled_skips_check_hop():
     )
     llm = MagicMock()
 
-    def chat_structured_side_effect(messages, schema):
+    def chat_structured_side_effect(messages, schema, **kwargs):
         if schema == QueryPlan:
             return StructuredResponse(parsed=_make_query_plan(), usage=_usage())
         if schema == GenerationResponse:
@@ -553,7 +553,7 @@ def test_reflection_exhausted_terminates_after_max_iterations():
     llm = MagicMock()
     generation_calls = {"count": 0}
 
-    def chat_structured_side_effect(messages, schema):
+    def chat_structured_side_effect(messages, schema, **kwargs):
         if schema == QueryPlan:
             return StructuredResponse(parsed=_make_query_plan(), usage=_usage())
         if schema == GenerationResponse:

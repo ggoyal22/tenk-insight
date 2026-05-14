@@ -7,6 +7,7 @@ from config.loader import GenerationConfig
 from llm.base import BaseLLM
 from llm.types import Message
 from generation.nodes._context import build_context
+from generation.token_limits import MAX_TOKENS_REFLECT
 from generation.types import GenerationState, ReflectionDecision
 
 logger = logging.getLogger(__name__)
@@ -28,7 +29,7 @@ def make_reflect(llm: BaseLLM, config: GenerationConfig, prompt: str) -> Callabl
                 ),
             ),
         ]
-        response = llm.chat_structured(messages, ReflectionDecision)
+        response = llm.chat_structured(messages, ReflectionDecision, max_tokens=MAX_TOKENS_REFLECT)
         decision = response.parsed
 
         pending_tasks = (

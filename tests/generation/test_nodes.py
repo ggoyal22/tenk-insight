@@ -324,7 +324,7 @@ def test_hyde_expand_preserves_task_order():
     responses = ["passage A", "passage B", "passage C"]
     call_count = {"n": 0}
 
-    def chat_side_effect(messages):
+    def chat_side_effect(messages, **kwargs):
         idx = call_count["n"]
         call_count["n"] += 1
         return LLMResponse(content=responses[idx], usage=_make_usage())

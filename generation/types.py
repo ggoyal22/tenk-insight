@@ -9,16 +9,21 @@ from llm.types import LLMUsage, Message
 from retrieval.types import MetadataFilter, RetrievalResult
 
 
+# ── Field length limits for LLM-produced query strings ───────────────────────
+_MAX_KEYWORD_QUERY  = 150
+_MAX_SEMANTIC_QUERY = 300
+_MAX_HYDE_QUERY     = 800
+
 # ── Pydantic models — produced by the LLM via chat_structured() ──────────────
 # These must be BaseModel so chat_structured() can derive a JSON Schema from
 # them and parse the LLM's response back into typed objects.
 
 class RetrievalTask(BaseModel):
     """A single retrieval request: a search query plus optional metadata filters."""
-    keyword_query: str
-    semantic_query: str
+    keyword_query: str = Field(max_length=_MAX_KEYWORD_QUERY)
+    semantic_query: str = Field(max_length=_MAX_SEMANTIC_QUERY)
     filter: MetadataFilter | None = None
-    hyde_query: str | None = None
+    hyde_query: str | None = Field(default=None, max_length=_MAX_HYDE_QUERY)
 
 
 class QueryPlan(BaseModel):

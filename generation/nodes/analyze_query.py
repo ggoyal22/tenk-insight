@@ -4,6 +4,7 @@ from collections.abc import Callable
 from db.repositories.filings import FilingsRepo
 from generation.nodes._stream import get_writer
 from generation.types import GenerationResult, GenerationState, QueryPlan
+from generation.token_limits import MAX_TOKENS_ANALYZE
 from llm.base import BaseLLM
 from llm.types import Message
 
@@ -23,7 +24,7 @@ def make_analyze_query(
             Message(role="system", content=prompt),
             Message(role="user", content=_build_user_message(state)),
         ]
-        response = llm.chat_structured(messages, QueryPlan)
+        response = llm.chat_structured(messages, QueryPlan, max_tokens=MAX_TOKENS_ANALYZE)
         plan = response.parsed
 
         logger.debug(
