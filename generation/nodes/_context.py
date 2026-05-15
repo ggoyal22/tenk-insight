@@ -31,5 +31,5 @@ def build_hop_context(results: list[RetrievalResult]) -> str:
             f"[{i}] [{f.ticker} | {f.form_type} | "
             f"{f.fiscal_year_end or f.filing_date} | {r.chunk.section}]"
         )
-        parts.append(f"{label}\n{r.chunk.text}")
+        parts.append(f"{label}\nkeyword query: {r.keyword_query}\nsemantic query: {r.semantic_query}\n{r.chunk.text}")
     return "\n\n---\n\n".join(parts) if parts else "No context retrieved."

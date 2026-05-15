@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from uuid import UUID
 
 from db.models import ChunkRecord, FilingRecord, ParentChunkRecord
@@ -14,6 +14,8 @@ class MetadataFilter:
 
 @dataclass
 class RetrievalResult:
+    keyword_query: str = field(default="", kw_only=True)
+    semantic_query: str = field(default="", kw_only=True)
     score: float
     vector_score: float | None
     keyword_score: float | None

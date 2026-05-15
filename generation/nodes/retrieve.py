@@ -57,6 +57,11 @@ def make_retrieve(retriever: Retriever, embedder: Embedder) -> Callable[[Retriev
                 "completed_results": [results],
                 "failed_queries": [task.model_copy(update={"hyde_query": None})],
             }
+
+        for r in results:
+            r.keyword_query = task.keyword_query
+            r.semantic_query = task.semantic_query
+
         return {"completed_results": [results]}
 
     return retrieve
