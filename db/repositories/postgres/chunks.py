@@ -82,6 +82,8 @@ class PostgresChunksRepository(ChunksRepo, PostgresRepository[ChunkRecord]):
         "web":      "websearch_to_tsquery",
     }
 
+    _FALLBACK_TERMS = 3
+
     def keyword_search(
         self,
         query: str,
@@ -90,7 +92,30 @@ class PostgresChunksRepository(ChunksRepo, PostgresRepository[ChunkRecord]):
         section: str | None = None,
         query_mode: str = "web",
     ) -> list[tuple[UUID, float]]:
+        results = self._fts_query(query, top_k, filing_ids, section, query_mode)
+        if results:
+            return results
+
+        # Full AND matched nothing — retry with the first N terms (highest priority).
+        terms = query.split()
+        if len(terms) > self._FALLBACK_TERMS:
+            fallback_query = " ".join(terms[:self._FALLBACK_TERMS])
+            results = self._fts_query(fallback_query, top_k, filing_ids, section, query_mode)
+
+        return results
+
+    def _fts_query(
+        self,
+        query: str,
+        top_k: int,
+        filing_ids: list[UUID] | None,
+        section: str | None,
+        query_mode: str,
+    ) -> list[tuple[UUID, float]]:
         query_fn = self._QUERY_FN.get(query_mode, "websearch_to_tsquery")
+        # Hyphens trigger strict phrase matching in websearch_to_tsquery; replace with spaces
+        # so "full-time" matches as individual terms rather than requiring exact adjacency.
+        query = query.replace("-", " ")
 
         where_parts = [f"search_vector @@ {query_fn}('english', %s)"]
         params: list = [query]

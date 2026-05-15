@@ -12,18 +12,23 @@ the provided context, cite sources, and explicitly state when information is abs
 # ── Shared retrieval-task fragments ──────────────────────────────────────────
 
 _KEYWORD_QUERY_RULES = (
-    "Space-separated financial terms for BM25/keyword search "
-    '(e.g. "total revenues net sales fiscal year AAPL"). '
-    "All terms are AND-matched against filing text — every term must appear verbatim "
-    "in the same passage or that passage is excluded. "
-    "Rules: (1) use only terms that literally appear in 10-K filings; "
+    "Space-separated financial terms for full-text search. "
+    "All terms are AND-matched — every term must appear in the same passage or that passage is excluded. "
+    "Rules: "
+    "(1) use only terms that literally appear in 10-K filings; "
     '(2) never use generic descriptors like "count", "figure", "amount", "number", '
     '"data", "information" — these are rarely in filing text; '
-    "(3) prefer 3–6 precise co-occurring terms over many approximate ones; "
-    "(4) when targeting a category (e.g. reportable segments, geographic regions), "
+    "(3) use 3–6 terms; "
+    "(4) put the most specific, discriminative terms first — if the query falls back to "
+    "fewer terms due to zero results, the first 3 are kept; "
+    "(5) do NOT include ticker symbols, fiscal year numbers, or form type — those are "
+    "already applied as metadata filters and waste AND slots; "
+    "(6) do NOT use hyphenated compounds — write 'full time' not 'full-time', "
+    "'year over year' not 'year-over-year' (hyphens trigger strict phrase matching); "
+    "(7) when targeting a category (e.g. reportable segments, geographic regions), "
     "do NOT enumerate specific member names absent from the original query — use the "
     "category term instead, which co-occurs with all members in headers and tables. "
-    'Examples: headcount → "full-time employees"; gross margin → "gross profit revenue cost"; '
+    'Examples: headcount → "employees headcount"; gross margin → "gross profit revenue cost"; '
     'free cash flow → "operating activities capital expenditures"; '
     'segment revenues (names unknown) → "reportable segments revenue".'
 )
