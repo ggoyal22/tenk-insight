@@ -1,11 +1,18 @@
 """RAGAS-backed evaluator.
 
 Metric name → RAGAS class mapping:
-  faithfulness          → Faithfulness
-  answer_relevancy      → AnswerRelevancy
-  context_precision     → ContextPrecisionWithoutReference  (query-relative; no golden needed)
-  context_recall        → ContextRecall                     (reference-required)
-  answer_correctness    → AnswerCorrectness                 (reference-required)
+  faithfulness            → Faithfulness
+  answer_relevancy        → AnswerRelevancy
+  context_precision       → ContextPrecisionWithoutReference  (query-relative; no golden needed)
+  context_recall          → ContextRecall                     (reference-required)
+  answer_correctness      → AnswerCorrectness                 (reference-required)
+  factual_correctness     → FactualCorrectness                (reference-required)
+  semantic_similarity     → SemanticSimilarity                (reference-required; embeddings only)
+  context_relevance       → ContextRelevance
+  context_entity_recall   → ContextEntityRecall               (reference-required)
+  noise_sensitivity       → NoiseSensitivity                  (reference-required)
+  context_utilization     → ContextUtilization
+  response_groundedness   → ResponseGroundedness
 
 Reference-required metrics are silently dropped when no sample in the batch
 has a non-None reference, rather than raising an error.
@@ -23,9 +30,16 @@ from ragas.llms import llm_factory
 from ragas.metrics.collections import (
     AnswerCorrectness,
     AnswerRelevancy,
+    ContextEntityRecall,
     ContextPrecisionWithoutReference,
     ContextRecall,
+    ContextRelevance,
+    ContextUtilization,
+    FactualCorrectness,
     Faithfulness,
+    NoiseSensitivity,
+    ResponseGroundedness,
+    SemanticSimilarity,
 )
 
 from config.loader import JudgeLLMConfig
@@ -35,25 +49,49 @@ from evaluation.types import EvalSample, EvaluationResult
 logger = logging.getLogger(__name__)
 
 _METRIC_REGISTRY: dict[str, type] = {
-    "faithfulness": Faithfulness,
-    "answer_relevancy": AnswerRelevancy,
-    "context_precision": ContextPrecisionWithoutReference,
-    "context_recall": ContextRecall,
-    "answer_correctness": AnswerCorrectness,
+    "faithfulness":          Faithfulness,
+    "answer_relevancy":      AnswerRelevancy,
+    "context_precision":     ContextPrecisionWithoutReference,
+    "context_recall":        ContextRecall,
+    "answer_correctness":    AnswerCorrectness,
+    "factual_correctness":   FactualCorrectness,
+    "semantic_similarity":   SemanticSimilarity,
+    "context_relevance":     ContextRelevance,
+    "context_entity_recall": ContextEntityRecall,
+    "noise_sensitivity":     NoiseSensitivity,
+    "context_utilization":   ContextUtilization,
+    "response_groundedness": ResponseGroundedness,
 }
 
 # Keys each metric's ascore() expects — used to build batch_score inputs.
 _METRIC_KWARGS: dict[str, list[str]] = {
-    "faithfulness": ["user_input", "response", "retrieved_contexts"],
-    "answer_relevancy": ["user_input", "response"],
-    "context_precision": ["user_input", "response", "retrieved_contexts"],
-    "context_recall": ["user_input", "retrieved_contexts", "reference"],
-    "answer_correctness": ["user_input", "response", "reference"],
+    "faithfulness":          ["user_input", "response", "retrieved_contexts"],
+    "answer_relevancy":      ["user_input", "response"],
+    "context_precision":     ["user_input", "response", "retrieved_contexts"],
+    "context_recall":        ["user_input", "retrieved_contexts", "reference"],
+    "answer_correctness":    ["user_input", "response", "reference"],
+    "factual_correctness":   ["response", "reference"],
+    "semantic_similarity":   ["response", "reference"],
+    "context_relevance":     ["user_input", "retrieved_contexts"],
+    "context_entity_recall": ["reference", "retrieved_contexts"],
+    "noise_sensitivity":     ["user_input", "response", "reference", "retrieved_contexts"],
+    "context_utilization":   ["user_input", "response", "retrieved_contexts"],
+    "response_groundedness": ["response", "retrieved_contexts"],
 }
 
-_REFERENCE_REQUIRED: frozenset[str] = frozenset({"context_recall", "answer_correctness"})
-_CONTEXTS_REQUIRED: frozenset[str] = frozenset({"faithfulness", "context_precision", "context_recall"})
+_REFERENCE_REQUIRED: frozenset[str] = frozenset({
+    "context_recall", "answer_correctness", "factual_correctness",
+    "semantic_similarity", "context_entity_recall", "noise_sensitivity",
+})
+_CONTEXTS_REQUIRED: frozenset[str] = frozenset({
+    "faithfulness", "context_precision", "context_recall",
+    "context_relevance", "context_entity_recall", "noise_sensitivity",
+    "context_utilization", "response_groundedness",
+})
+# Metrics that take both llm + embeddings.
 _EMBEDDINGS_REQUIRED: frozenset[str] = frozenset({"answer_relevancy", "answer_correctness"})
+# Metrics that take only embeddings (no llm).
+_EMBEDDINGS_ONLY: frozenset[str] = frozenset({"semantic_similarity"})
 
 
 class RagasEvaluator(BaseEvaluator):
@@ -111,11 +149,12 @@ class RagasEvaluator(BaseEvaluator):
         async def _score_metric(name: str, delay: float = 0.0) -> None:
             if delay:
                 await asyncio.sleep(delay)
-            metric = (
-                _METRIC_REGISTRY[name](llm=llm, embeddings=embeddings)
-                if name in _EMBEDDINGS_REQUIRED
-                else _METRIC_REGISTRY[name](llm=llm)
-            )
+            if name in _EMBEDDINGS_ONLY:
+                metric = _METRIC_REGISTRY[name](embeddings=embeddings)
+            elif name in _EMBEDDINGS_REQUIRED:
+                metric = _METRIC_REGISTRY[name](llm=llm, embeddings=embeddings)
+            else:
+                metric = _METRIC_REGISTRY[name](llm=llm)
 
             if name in _CONTEXTS_REQUIRED:
                 # RAGAS raises ValueError on empty lists — score those 0.0 directly
