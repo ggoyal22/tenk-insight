@@ -5,6 +5,7 @@ Metric name → RAGAS class mapping:
   answer_relevancy      → AnswerRelevancy
   context_precision     → ContextPrecisionWithoutReference  (query-relative; no golden needed)
   context_recall        → ContextRecall                     (reference-required)
+  answer_correctness    → AnswerCorrectness                 (reference-required)
 
 Reference-required metrics are silently dropped when no sample in the batch
 has a non-None reference, rather than raising an error.
@@ -20,6 +21,7 @@ from openai import AsyncOpenAI
 from ragas.embeddings.base import embedding_factory
 from ragas.llms import llm_factory
 from ragas.metrics.collections import (
+    AnswerCorrectness,
     AnswerRelevancy,
     ContextPrecisionWithoutReference,
     ContextRecall,
@@ -37,6 +39,7 @@ _METRIC_REGISTRY: dict[str, type] = {
     "answer_relevancy": AnswerRelevancy,
     "context_precision": ContextPrecisionWithoutReference,
     "context_recall": ContextRecall,
+    "answer_correctness": AnswerCorrectness,
 }
 
 # Keys each metric's ascore() expects — used to build batch_score inputs.
@@ -45,10 +48,12 @@ _METRIC_KWARGS: dict[str, list[str]] = {
     "answer_relevancy": ["user_input", "response"],
     "context_precision": ["user_input", "response", "retrieved_contexts"],
     "context_recall": ["user_input", "retrieved_contexts", "reference"],
+    "answer_correctness": ["user_input", "response", "reference"],
 }
 
-_REFERENCE_REQUIRED: frozenset[str] = frozenset({"context_recall"})
+_REFERENCE_REQUIRED: frozenset[str] = frozenset({"context_recall", "answer_correctness"})
 _CONTEXTS_REQUIRED: frozenset[str] = frozenset({"faithfulness", "context_precision", "context_recall"})
+_EMBEDDINGS_REQUIRED: frozenset[str] = frozenset({"answer_relevancy", "answer_correctness"})
 
 
 class RagasEvaluator(BaseEvaluator):
@@ -108,7 +113,7 @@ class RagasEvaluator(BaseEvaluator):
                 await asyncio.sleep(delay)
             metric = (
                 _METRIC_REGISTRY[name](llm=llm, embeddings=embeddings)
-                if name == "answer_relevancy"
+                if name in _EMBEDDINGS_REQUIRED
                 else _METRIC_REGISTRY[name](llm=llm)
             )
 
