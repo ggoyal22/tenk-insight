@@ -45,6 +45,8 @@ class Retriever:
         filing_ids = self._resolve_filing_ids(filters)
         raw_section = filters.section if filters else None
         section = raw_section.strip().rstrip(".") if raw_section else None
+        if section and section.lower() == "null":
+            section = None
 
         ranked_lists: list[list[tuple[UUID, float]]] = []
         vector_scores: dict[UUID, float] = {}

@@ -34,20 +34,20 @@ _KEYWORD_QUERY_RULES = (
 )
 
 _SECTION_FILTER = (
-    "null      → default; use when content could appear in more than one section or when "
-    "you are not certain — different companies organise their 10-Ks differently and "
-    "over-constraining silently excludes the right chunks. Only set a specific section "
-    "when you are certain the content lives there exclusively.\n"
+    "null      → default; use when content could appear in more than one section, when you "
+    "are not certain, or when looking for specific financial statement figures (segment revenue "
+    "tables, balance sheet line items, note disclosures, EPS, debt or lease schedules) — "
+    "companies vary widely in which item they file financial statements under (Item 8, Item 15, "
+    "Item 16, etc.), so null avoids silently excluding the right chunks. "
+    "Always write JSON null, never the string \"null\".\n"
     '    "Item 1"  → business description, segments, products, strategy\n'
     '    "Item 1A" → risk factors\n'
     '    "Item 2"  → properties, facilities\n'
     '    "Item 3"  → legal proceedings\n'
-    '    "Item 7"  → financial metrics: revenue, profit, margins, cash flow, debt; '
-    "also liquidity and capital resources, cash and cash equivalents, marketable securities, "
-    "share repurchases, dividends (any MD&A discussion of balance-sheet position or capital allocation)\n"
+    '    "Item 7"  → MD&A narrative: revenue trends, margin discussion, liquidity commentary, '
+    "capital allocation — qualitative discussion and year-over-year explanations; "
+    "not for specific dollar amounts that live in the financial statements themselves\n"
     '    "Item 7A" → quantitative market risk, FX, interest rate exposure\n'
-    '    "Item 8"  → financial statements and notes (balance sheet, income statement, '
-    "pension obligations, lease obligations, debt schedules, tax footnotes, segment footnotes)\n"
     '    "Item 11" → executive compensation'
 )
 
@@ -219,6 +219,8 @@ When providing next_task:
 - filter:{_FILTER_GUIDANCE}
 
 If the user message lists queries under "Queries already attempted that returned no results", do not repeat those keyword_query or semantic_query values. Either reformulate with different terminology or a broader/different filter, or return done: true if no meaningfully different query is possible.
+
+If the retrieved context contains only a cross-reference (e.g. "The information required by this Item is set forth in our Consolidated Financial Statements and Notes thereto"), the actual data is stored under a different section in this filing — retry with section: null so the search is not constrained to the section that only holds the redirect.
 
 Default to done: true. Only request further retrieval if the gap is concrete and the missing information is likely to exist in a 10-K filing."""
 
