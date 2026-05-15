@@ -6,7 +6,7 @@ from generation.nodes._stream import get_writer
 from config.loader import GenerationConfig
 from llm.base import BaseLLM
 from llm.types import Message
-from generation.nodes._context import build_context
+from generation.nodes._context import build_hop_context
 from generation.token_limits import MAX_TOKENS_CHECK_HOP
 from generation.types import GenerationState, HopDecision
 
@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 def make_check_hop(llm: BaseLLM, config: GenerationConfig, prompt: str) -> Callable[[GenerationState], dict]:
     def check_hop(state: GenerationState) -> dict:
         get_writer()("Evaluating whether more retrieval is needed...")
-        context = build_context([r for group in state["completed_results"] for r in group])
+        context = build_hop_context([r for group in state["completed_results"] for r in group])
         messages = [
             Message(role="system", content=prompt),
             Message(
