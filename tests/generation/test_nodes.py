@@ -439,36 +439,68 @@ def test_generate_deduplicates_citations():
     assert len(output["answer"].citations) == 1
 
 
-def test_generate_orders_high_frequency_chunks_first_in_context():
+def test_generate_orders_by_best_reranker_score():
     llm = _make_llm(structured_return=_make_gen_response("Answer.", []))
     filing = _make_filing()
 
-    high_freq_parent = ParentChunkRecord(
+    high_score_parent = ParentChunkRecord(
         id=uuid.uuid4(), filing_id=filing.id, chunk_index=0, section="s1",
-        text="HIGH FREQUENCY CHUNK", token_count=3, content_hash="a" * 64,
+        text="HIGH SCORE CHUNK", token_count=3, content_hash="a" * 64,
         created_at=datetime(2024, 3, 1),
     )
-    low_freq_parent = ParentChunkRecord(
+    low_score_parent = ParentChunkRecord(
         id=uuid.uuid4(), filing_id=filing.id, chunk_index=1, section="s2",
-        text="LOW FREQUENCY CHUNK", token_count=3, content_hash="b" * 64,
+        text="LOW SCORE CHUNK", token_count=3, content_hash="b" * 64,
         created_at=datetime(2024, 3, 1),
     )
-    high_freq_result = RetrievalResult(
-        score=0.9, vector_score=None, keyword_score=None, reranker_score=None,
-        chunk=_make_chunk(filing.id, high_freq_parent.id),
-        parent_chunk=high_freq_parent, filing=filing,
+    high_score_result = RetrievalResult(
+        score=0.5, vector_score=None, keyword_score=None, reranker_score=0.95,
+        chunk=_make_chunk(filing.id, high_score_parent.id),
+        parent_chunk=high_score_parent, filing=filing,
     )
-    low_freq_result = RetrievalResult(
-        score=0.9, vector_score=None, keyword_score=None, reranker_score=None,
-        chunk=_make_chunk(filing.id, low_freq_parent.id),
-        parent_chunk=low_freq_parent, filing=filing,
+    low_score_result = RetrievalResult(
+        score=0.9, vector_score=None, keyword_score=None, reranker_score=0.40,
+        chunk=_make_chunk(filing.id, low_score_parent.id),
+        parent_chunk=low_score_parent, filing=filing,
     )
 
     node = make_generate(llm, "Answer the question.", "Compare the companies.")
-    output = node(_base_state(completed_results=[[high_freq_result, low_freq_result], [high_freq_result]]))
+    output = node(_base_state(completed_results=[[low_score_result, high_score_result]]))
 
     context = llm.chat_structured.call_args[0][0][-1].content
-    assert context.index("HIGH FREQUENCY CHUNK") < context.index("LOW FREQUENCY CHUNK")
+    assert context.index("HIGH SCORE CHUNK") < context.index("LOW SCORE CHUNK")
+
+
+def test_generate_falls_back_to_rrf_score_when_no_reranker():
+    llm = _make_llm(structured_return=_make_gen_response("Answer.", []))
+    filing = _make_filing()
+
+    high_score_parent = ParentChunkRecord(
+        id=uuid.uuid4(), filing_id=filing.id, chunk_index=0, section="s1",
+        text="HIGH RRF CHUNK", token_count=3, content_hash="a" * 64,
+        created_at=datetime(2024, 3, 1),
+    )
+    low_score_parent = ParentChunkRecord(
+        id=uuid.uuid4(), filing_id=filing.id, chunk_index=1, section="s2",
+        text="LOW RRF CHUNK", token_count=3, content_hash="b" * 64,
+        created_at=datetime(2024, 3, 1),
+    )
+    high_score_result = RetrievalResult(
+        score=0.9, vector_score=None, keyword_score=None, reranker_score=None,
+        chunk=_make_chunk(filing.id, high_score_parent.id),
+        parent_chunk=high_score_parent, filing=filing,
+    )
+    low_score_result = RetrievalResult(
+        score=0.4, vector_score=None, keyword_score=None, reranker_score=None,
+        chunk=_make_chunk(filing.id, low_score_parent.id),
+        parent_chunk=low_score_parent, filing=filing,
+    )
+
+    node = make_generate(llm, "Answer the question.", "Compare the companies.")
+    output = node(_base_state(completed_results=[[low_score_result, high_score_result]]))
+
+    context = llm.chat_structured.call_args[0][0][-1].content
+    assert context.index("HIGH RRF CHUNK") < context.index("LOW RRF CHUNK")
 
 
 def test_generate_filters_citations_to_cited_indices():

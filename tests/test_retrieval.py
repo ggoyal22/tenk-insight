@@ -169,7 +169,7 @@ class TestRetrieverModes:
         assert results[0].chunk.id == chunk_id
 
     def test_results_trimmed_to_final_top_k_when_reranker_disabled(self):
-        # 3 chunks each with a distinct parent — dedup keeps all 3, final_top_k=2 caps at 2
+        # 3 chunks each with a distinct parent — final_top_k=2 caps at 2
         ids = [uuid4() for _ in range(3)]
         filing_id = uuid4()
         parent_ids = [uuid4() for _ in range(3)]
@@ -204,6 +204,47 @@ class TestRetrieverModes:
         results = retriever.retrieve(keyword_query="GPU", semantic_embedding=[0.1] * 8)
 
         assert len(results) == 2
+
+    def test_sibling_chunks_from_same_parent_not_deduplicated(self):
+        # 2 chunks sharing one parent — retriever now returns both; generate node deduplicates
+        chunk_id_a, chunk_id_b = uuid4(), uuid4()
+        filing_id = uuid4()
+        shared_parent_id = uuid4()
+        filing = _filing_record(filing_id)
+        parent = _parent_record(shared_parent_id, filing_id)
+        chunk_a = _chunk_record(chunk_id_a, filing_id, shared_parent_id)
+        chunk_b = _chunk_record(chunk_id_b, filing_id, shared_parent_id)
+
+        chunks_repo = MagicMock()
+        chunks_repo.get_by_ids_no_embedding.return_value = [chunk_a, chunk_b]
+        parents_repo = MagicMock()
+        parents_repo.get_by_ids.return_value = [parent]
+        filings_repo = MagicMock()
+        filings_repo.get_by_ids.return_value = [filing]
+        filings_repo.list_ids.return_value = None
+
+        config = RetrievalConfig(
+            vector_search=VectorSearchConfig(enabled=True, oversample_k=5, similarity_threshold=0.0),
+            keyword_search=KeywordSearchConfig(enabled=False),
+            fusion=FusionConfig(top_k=5),
+            reranking=RerankingConfig(enabled=False),
+            final_top_k=5,
+        )
+
+        vector_retriever = MagicMock()
+        vector_retriever.search.return_value = [(chunk_id_a, 0.9), (chunk_id_b, 0.8)]
+
+        retriever = Retriever(
+            config=config, fusion=RRFFusion(),
+            chunks_repo=chunks_repo, parent_chunks_repo=parents_repo, filings_repo=filings_repo,
+            vector_retriever=vector_retriever,
+        )
+        results = retriever.retrieve(keyword_query="GPU", semantic_embedding=[0.1] * 8)
+
+        assert len(results) == 2
+        assert results[0].chunk.id == chunk_id_a
+        assert results[1].chunk.id == chunk_id_b
+        assert results[0].parent_chunk.id == results[1].parent_chunk.id == shared_parent_id
 
 
 # ── CrossEncoderReranker tests ────────────────────────────────────────────────

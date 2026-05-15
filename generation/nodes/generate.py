@@ -64,20 +64,23 @@ def _select_prompt(query_type: str, qa: str, comparison: str) -> str:
 
 
 def _deduplicate(completed_results: list[list[RetrievalResult]]) -> list[RetrievalResult]:
-    """Flatten multi-hop results, deduplicate by parent_chunk.id, sort by hop frequency descending.
+    """Flatten multi-hop results, deduplicate by parent_chunk.id, sort by best child relevance score.
 
-    Chunks retrieved across more hops appear first — mitigates Lost-in-the-Middle
-    by placing the most corroborated evidence at the top of the LLM context.
+    For each parent, tracks the max reranker_score (or RRF score as fallback) across all
+    children seen — places the most query-relevant parent context first to mitigate
+    Lost-in-the-Middle.
     """
-    frequency: dict[UUID, int] = {}
+    best_score: dict[UUID, float] = {}
     unique: dict[UUID, RetrievalResult] = {}
     for result_group in completed_results:
         for r in result_group:
             pid = r.parent_chunk.id
-            frequency[pid] = frequency.get(pid, 0) + 1
+            score = r.reranker_score if r.reranker_score is not None else r.score
+            if score > best_score.get(pid, float("-inf")):
+                best_score[pid] = score
             if pid not in unique:
                 unique[pid] = r
-    return sorted(unique.values(), key=lambda r: frequency[r.parent_chunk.id], reverse=True)
+    return sorted(unique.values(), key=lambda r: best_score[r.parent_chunk.id], reverse=True)
 
 
 def _filter_by_indices(results: list[RetrievalResult], cited_indices: list[int]) -> list[RetrievalResult]:

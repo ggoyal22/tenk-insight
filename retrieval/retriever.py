@@ -143,7 +143,6 @@ class Retriever:
 
         iteration_order = [cid for cid, _ in reranked] if reranked else chunk_ids
 
-        seen_parents: set[UUID] = set()
         results: list[RetrievalResult] = []
         for chunk_id in iteration_order:
             chunk = chunk_map.get(chunk_id)
@@ -162,10 +161,6 @@ class Retriever:
                     f"Chunk {chunk_id} references parent {chunk.parent_chunk_id} which was not found. "
                     "This indicates incomplete ingestion — re-run the ingestion pipeline."
                 )
-
-            if parent.id in seen_parents:
-                continue
-            seen_parents.add(parent.id)
 
             results.append(RetrievalResult(
                 score=rrf_score_map[chunk_id],
