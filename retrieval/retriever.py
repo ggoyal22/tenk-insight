@@ -43,7 +43,8 @@ class Retriever:
         rerank_query: str | None = None,
     ) -> list[RetrievalResult]:
         filing_ids = self._resolve_filing_ids(filters)
-        section = filters.section if filters else None
+        raw_section = filters.section if filters else None
+        section = raw_section.strip().rstrip(".") if raw_section else None
 
         ranked_lists: list[list[tuple[UUID, float]]] = []
         vector_scores: dict[UUID, float] = {}
@@ -78,12 +79,16 @@ class Retriever:
         fused = self._fusion.fuse(*ranked_lists)
         fused = fused[: self._config.fusion.top_k]
 
-        results = self._enrich(fused, vector_scores, keyword_scores)
+        reranking_active = bool(self._reranker and self._config.reranking.enabled)
+        reranked: list[tuple[UUID, float]] | None = None
 
-        if self._reranker and self._config.reranking.enabled:
-            return self._reranker.rerank(rerank_query or keyword_query, results, self._config.reranking.top_k)
+        if reranking_active:
+            chunks = self._chunks.get_by_ids_no_embedding([cid for cid, _ in fused])
+            reranked = self._reranker.rerank(rerank_query or keyword_query, chunks)
 
-        return results[: self._config.final_top_k]
+        results = self._enrich(fused, vector_scores, keyword_scores, reranked=reranked)
+        top_k = self._config.reranking.top_k if reranking_active else self._config.final_top_k
+        return results[:top_k]
 
     def _resolve_filing_ids(self, filters: MetadataFilter | None) -> list[UUID] | None:
         if not filters or not self._config.metadata_filtering.enabled:
@@ -112,13 +117,20 @@ class Retriever:
         fused: list[tuple[UUID, float]],
         vector_scores: dict[UUID, float],
         keyword_scores: dict[UUID, float],
+        reranked: list[tuple[UUID, float]] | None = None,
     ) -> list[RetrievalResult]:
-        """Batch-fetch chunks, parent chunks, and filings; assemble RetrievalResult objects."""
+        """Batch-fetch chunks, parent chunks, and filings; assemble RetrievalResult objects.
+
+        When reranked is provided, iteration follows reranker order so parent dedup
+        keeps the highest-reranker-scored child per parent. RRF scores from fused
+        are preserved in RetrievalResult.score.
+        """
         if not fused:
             return []
 
         chunk_ids = [cid for cid, _ in fused]
-        score_map = {cid: score for cid, score in fused}
+        rrf_score_map = {cid: score for cid, score in fused}
+        reranker_score_map = {cid: score for cid, score in reranked} if reranked else {}
 
         chunks = self._chunks.get_by_ids_no_embedding(chunk_ids)
         chunk_map = {c.id: c for c in chunks}
@@ -129,9 +141,11 @@ class Retriever:
         filing_ids = list({c.filing_id for c in chunks})
         filing_map = {f.id: f for f in self._filings.get_by_ids(filing_ids)}
 
+        iteration_order = [cid for cid, _ in reranked] if reranked else chunk_ids
+
         seen_parents: set[UUID] = set()
         results: list[RetrievalResult] = []
-        for chunk_id in chunk_ids:
+        for chunk_id in iteration_order:
             chunk = chunk_map.get(chunk_id)
             if chunk is None:
                 logger.warning("Chunk %s not found during enrichment — skipping.", chunk_id)
@@ -154,10 +168,10 @@ class Retriever:
             seen_parents.add(parent.id)
 
             results.append(RetrievalResult(
-                score=score_map[chunk_id],
+                score=rrf_score_map[chunk_id],
                 vector_score=vector_scores.get(chunk_id),
                 keyword_score=keyword_scores.get(chunk_id),
-                reranker_score=None,
+                reranker_score=reranker_score_map.get(chunk_id),
                 chunk=chunk,
                 parent_chunk=parent,
                 filing=filing,

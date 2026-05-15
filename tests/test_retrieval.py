@@ -11,7 +11,7 @@ from db.models import ChunkRecord, FilingRecord, ParentChunkRecord
 from retrieval.fusion.rrf import RRFFusion
 from retrieval.reranker.cross_encoder import CrossEncoderReranker
 from retrieval.retriever import Retriever
-from retrieval.types import MetadataFilter, RetrievalResult
+from retrieval.types import MetadataFilter
 
 
 def _ids(*n: int) -> list[UUID]:
@@ -209,74 +209,52 @@ class TestRetrieverModes:
 # ── CrossEncoderReranker tests ────────────────────────────────────────────────
 
 class TestCrossEncoderReranker:
-    def _make_result(self, parent_id: UUID) -> RetrievalResult:
-        filing_id = uuid4()
-        filing = _filing_record(filing_id)
-        parent = _parent_record(parent_id, filing_id)
-        chunk = _chunk_record(uuid4(), filing_id, parent_id)
-        return RetrievalResult(
-            score=0.5, vector_score=None, keyword_score=None, reranker_score=None,
-            chunk=chunk, parent_chunk=parent, filing=filing,
-        )
-
     @patch("retrieval.reranker.cross_encoder.CrossEncoder")
-    def test_rerank_sorts_by_reranker_score_descending(self, MockCE):
+    def test_rerank_sorts_by_score_descending(self, MockCE):
         mock_model = MagicMock()
         mock_model.predict.return_value.tolist.return_value = [0.3, 0.9, 0.6]
         MockCE.return_value = mock_model
 
         reranker = CrossEncoderReranker("mock-model")
-        results = [self._make_result(uuid4()) for _ in range(3)]
-        ranked = reranker.rerank("test query", results, top_k=3)
+        filing_id, parent_id = uuid4(), uuid4()
+        chunks = [_chunk_record(uuid4(), filing_id, parent_id) for _ in range(3)]
+        ranked = reranker.rerank("test query", chunks)
 
-        reranker_scores = [r.reranker_score for r in ranked]
-        assert reranker_scores == sorted(reranker_scores, reverse=True)
+        scores = [s for _, s in ranked]
+        assert scores == sorted(scores, reverse=True)
 
     @patch("retrieval.reranker.cross_encoder.CrossEncoder")
-    def test_rerank_sets_reranker_score_and_preserves_rrf_score(self, MockCE):
+    def test_rerank_returns_correct_chunk_id_and_score(self, MockCE):
         mock_model = MagicMock()
         mock_model.predict.return_value.tolist.return_value = [0.8]
         MockCE.return_value = mock_model
 
         reranker = CrossEncoderReranker("mock-model")
-        result = self._make_result(uuid4())
-        original_rrf_score = result.score
+        filing_id, parent_id = uuid4(), uuid4()
+        chunk = _chunk_record(uuid4(), filing_id, parent_id)
+        ranked = reranker.rerank("test query", [chunk])
 
-        ranked = reranker.rerank("test query", [result], top_k=1)
-
-        assert ranked[0].reranker_score == 0.8
-        assert ranked[0].score == original_rrf_score
-
-    @patch("retrieval.reranker.cross_encoder.CrossEncoder")
-    def test_rerank_skips_duplicate_parent_inference(self, MockCE):
-        mock_model = MagicMock()
-        mock_model.predict.return_value.tolist.return_value = [0.8]
-        MockCE.return_value = mock_model
-
-        reranker = CrossEncoderReranker("mock-model")
-        shared_parent_id = uuid4()
-        results = [self._make_result(shared_parent_id), self._make_result(shared_parent_id)]
-
-        ranked = reranker.rerank("test query", results, top_k=2)
-
-        pairs_scored = mock_model.predict.call_args[0][0]
-        assert len(pairs_scored) == 1
         assert len(ranked) == 1
+        cid, score = ranked[0]
+        assert cid == chunk.id
+        assert score == 0.8
 
     @patch("retrieval.reranker.cross_encoder.CrossEncoder")
-    def test_rerank_respects_top_k(self, MockCE):
+    def test_rerank_scores_child_text(self, MockCE):
         mock_model = MagicMock()
-        mock_model.predict.return_value.tolist.return_value = [0.9, 0.7, 0.5]
+        mock_model.predict.return_value.tolist.return_value = [0.7]
         MockCE.return_value = mock_model
 
         reranker = CrossEncoderReranker("mock-model")
-        results = [self._make_result(uuid4()) for _ in range(3)]
-        ranked = reranker.rerank("test query", results, top_k=2)
+        filing_id, parent_id = uuid4(), uuid4()
+        chunk = _chunk_record(uuid4(), filing_id, parent_id)
+        reranker.rerank("test query", [chunk])
 
-        assert len(ranked) == 2
+        pairs = mock_model.predict.call_args[0][0]
+        assert pairs == [("test query", chunk.text)]
 
     @patch("retrieval.reranker.cross_encoder.CrossEncoder")
     def test_rerank_empty_returns_empty(self, MockCE):
         MockCE.return_value = MagicMock()
         reranker = CrossEncoderReranker("mock-model")
-        assert reranker.rerank("query", [], top_k=5) == []
+        assert reranker.rerank("query", []) == []

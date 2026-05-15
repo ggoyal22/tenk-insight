@@ -1,11 +1,10 @@
-import dataclasses
 import logging
 from uuid import UUID
 
 from sentence_transformers import CrossEncoder
 
+from db.models import ChunkRecord
 from retrieval.reranker.base import BaseReranker
-from retrieval.types import RetrievalResult
 
 logger = logging.getLogger(__name__)
 
@@ -25,25 +24,13 @@ class CrossEncoderReranker(BaseReranker):
     def rerank(
         self,
         query: str,
-        results: list[RetrievalResult],
-        top_k: int,
-    ) -> list[RetrievalResult]:
-        if not results:
+        chunks: list[ChunkRecord],
+    ) -> list[tuple[UUID, float]]:
+        if not chunks:
             return []
 
-        seen: set[UUID] = set()
-        unique_results: list[RetrievalResult] = []
-        for r in results:
-            if r.parent_chunk.id not in seen:
-                seen.add(r.parent_chunk.id)
-                unique_results.append(r)
-
-        pairs = [(query, r.parent_chunk.text) for r in unique_results]
+        pairs = [(query, c.text) for c in chunks]
         scores: list[float] = self._model.predict(pairs).tolist()
 
-        ranked = sorted(zip(unique_results, scores), key=lambda x: x[1], reverse=True)
-
-        return [
-            dataclasses.replace(result, reranker_score=float(score))
-            for result, score in ranked[:top_k]
-        ]
+        ranked = sorted(zip([c.id for c in chunks], scores), key=lambda x: x[1], reverse=True)
+        return ranked

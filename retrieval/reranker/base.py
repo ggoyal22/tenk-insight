@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
+from uuid import UUID
 
-from retrieval.types import RetrievalResult
+from db.models import ChunkRecord
 
 
 class BaseReranker(ABC):
@@ -8,12 +9,10 @@ class BaseReranker(ABC):
     def rerank(
         self,
         query: str,
-        results: list[RetrievalResult],
-        top_k: int,
-    ) -> list[RetrievalResult]:
-        """Rerank results and return the top_k most relevant.
+        chunks: list[ChunkRecord],
+    ) -> list[tuple[UUID, float]]:
+        """Score child chunks by relevance against query.
 
-        Scores in the returned RetrievalResult objects reflect the reranker's
-        own relevance signal, replacing the upstream RRF scores.
+        Returns (chunk_id, score) pairs sorted by score descending.
         """
         ...

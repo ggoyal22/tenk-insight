@@ -210,7 +210,7 @@ class TestRetrieverEndToEnd:
         embedding = [0.1] * 1024
         vector_store.upsert(chunk_id, embedding, {"embedding_model": "test-model"})
 
-        results = retriever.retrieve(query="GPU supply chain", query_embedding=embedding)
+        results = retriever.retrieve(keyword_query="GPU supply chain", semantic_embedding=embedding)
 
         assert len(results) >= 1
         r = results[0]
@@ -243,8 +243,8 @@ class TestRetrieverEndToEnd:
         vector_store.upsert(amd_chunk_id, embedding, {"embedding_model": "test-model"})
 
         results = retriever.retrieve(
-            query="GPU supply chain",
-            query_embedding=embedding,
+            keyword_query="GPU supply chain",
+            semantic_embedding=embedding,
             filters=MetadataFilter(ticker="nvda"),  # lowercase — tests normalization
         )
 
@@ -254,5 +254,5 @@ class TestRetrieverEndToEnd:
 
     def test_retrieve_on_empty_db_returns_empty(self, db_client):
         retriever, *_ = _make_retriever(db_client)
-        results = retriever.retrieve(query="GPU supply chain", query_embedding=[0.1] * 1024)
+        results = retriever.retrieve(keyword_query="GPU supply chain", semantic_embedding=[0.1] * 1024)
         assert results == []
