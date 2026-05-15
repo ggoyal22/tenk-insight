@@ -103,17 +103,17 @@ Then produce:
 - `tasks`: retrieval tasks based on the reasoning above.
 
 For each task:
-- `keyword_query`: space-separated financial terms optimised for BM25/keyword search (e.g. "total revenues net sales fiscal year AAPL"). All terms are AND-matched against filing text — every term must appear verbatim in the same passage or that passage is excluded. Rules: (1) use only terms that literally appear in 10-K filings; (2) never use generic descriptors like "count", "figure", "amount", "number", "data", "information" — these are rarely in filing text; (3) prefer 3–6 precise co-occurring terms over many approximate ones. Examples: headcount → "full-time employees"; gross margin → "gross profit revenue cost"; free cash flow → "operating activities capital expenditures".
+- `keyword_query`: space-separated financial terms optimised for BM25/keyword search (e.g. "total revenues net sales fiscal year AAPL"). All terms are AND-matched against filing text — every term must appear verbatim in the same passage or that passage is excluded. Rules: (1) use only terms that literally appear in 10-K filings; (2) never use generic descriptors like "count", "figure", "amount", "number", "data", "information" — these are rarely in filing text; (3) prefer 3–6 precise co-occurring terms over many approximate ones; (4) when targeting a category (e.g. reportable segments, geographic regions), do NOT enumerate specific member names absent from the original query — use the category term instead, which co-occurs with all members in headers and tables. Examples: headcount → "full-time employees"; gross margin → "gross profit revenue cost"; free cash flow → "operating activities capital expenditures"; segment revenues (names unknown) → "reportable segments revenue".
 - `semantic_query`: natural language question for this specific task (e.g. "What was Apple's total revenue for fiscal year 2024?") — used for semantic/vector search and HyDE expansion
 - `filter.ticker`: company ticker symbol (resolved from step 3 above)
 - `filter.fiscal_year`: integer fiscal year (e.g. 2024), or null if unspecified
 - `filter.section`:
-    null      → use ONLY when the query genuinely spans multiple sections or cannot be mapped to any section below
+    null      → default; use when content could appear in more than one section or when you are not certain — different companies organise their 10-Ks differently and over-constraining silently excludes the right chunks. Only set a specific section when you are certain the content lives there exclusively.
     "Item 1"  → business description, segments, products, strategy
     "Item 1A" → risk factors
     "Item 2"  → properties, facilities
     "Item 3"  → legal proceedings
-    "Item 7"  → financial metrics: revenue, profit, margins, cash flow, debt
+    "Item 7"  → financial metrics: revenue, profit, margins, cash flow, debt; also liquidity and capital resources, cash and cash equivalents, marketable securities, share repurchases, dividends (any MD&A discussion of balance-sheet position or capital allocation)
     "Item 7A" → quantitative market risk, FX, interest rate exposure
     "Item 8"  → financial statements and notes (balance sheet, income statement, pension obligations, lease obligations, debt schedules, tax footnotes, segment footnotes)
     "Item 11" → executive compensation
@@ -146,7 +146,7 @@ Rules:
 - Answer solely from the provided context. Do not use outside knowledge.
 - Include [N] inline whenever you draw from an excerpt (e.g. "Revenue was $60.9B [1]").
 - Populate cited_indices with the numbers of every excerpt you drew from.
-- Be precise and thorough. Report the exact figures from the source material and all directly relevant supporting data: year-over-year comparisons, percentage changes, and explanations of what drove those changes. Do not stop at the headline number — if the context explains why a metric changed, include that explanation.
+- Be precise and thorough. Report the exact figures from the source material and all directly relevant supporting data. Include year-over-year comparisons, percentage changes, and explanations of what drove those changes only where the context explicitly states them — do not calculate or derive figures not directly present in the source. Do not stop at the headline number — if the context explains why a metric changed, include that explanation. When the context provides a breakdown of component figures for a composite metric, include those components — do not report only the aggregate.
 - If the context does not contain sufficient information to answer, say so explicitly — do not speculate or infer."""
 
 
@@ -174,9 +174,18 @@ Return done: true if the context contains sufficient information to answer the q
 Return done: false with a next_task only if specific, identifiable information is clearly missing.
 
 When providing next_task:
-- keyword_query: space-separated financial terms targeting only the missing information. All terms are AND-matched against filing text — every term must appear verbatim in the same passage or that passage is excluded. Rules: (1) use only terms that literally appear in 10-K filings; (2) never use generic descriptors like "count", "figure", "amount", "number", "data", "information" — these are rarely in filing text; (3) prefer 3–6 precise co-occurring terms over many approximate ones. Examples: headcount → "full-time employees"; gross margin → "gross profit revenue cost"; free cash flow → "operating activities capital expenditures"
+- keyword_query: space-separated financial terms targeting only the missing information. All terms are AND-matched against filing text — every term must appear verbatim in the same passage or that passage is excluded. Rules: (1) use only terms that literally appear in 10-K filings; (2) never use generic descriptors like "count", "figure", "amount", "number", "data", "information" — these are rarely in filing text; (3) prefer 3–6 precise co-occurring terms over many approximate ones; (4) when targeting a category (e.g. reportable segments, geographic regions), do NOT enumerate specific member names absent from the original query — use the category term instead, which co-occurs with all members in headers and tables. Examples: headcount → "full-time employees"; gross margin → "gross profit revenue cost"; free cash flow → "operating activities capital expenditures"; segment revenues (names unknown) → "reportable segments revenue".
 - semantic_query: one sentence natural language question for the specific missing information
-- filter: narrow as specifically as possible (ticker, fiscal_year); do not set section
+- filter: narrow to ticker and fiscal_year as specifically as possible; for section —
+    null      → default; use when content could appear in more than one section or when you are not certain — different companies organise their 10-Ks differently and over-constraining silently excludes the right chunks. Only set a specific section when you are certain the content lives there exclusively.
+    "Item 1"  → business description, segments, products, strategy
+    "Item 1A" → risk factors
+    "Item 2"  → properties, facilities
+    "Item 3"  → legal proceedings
+    "Item 7"  → financial metrics: revenue, profit, margins, cash flow, debt; also liquidity and capital resources, cash and cash equivalents, marketable securities, share repurchases, dividends (any MD&A discussion of balance-sheet position or capital allocation)
+    "Item 7A" → quantitative market risk, FX, interest rate exposure
+    "Item 8"  → financial statements and notes (balance sheet, income statement, pension obligations, lease obligations, debt schedules, tax footnotes, segment footnotes)
+    "Item 11" → executive compensation
 
 If the user message lists queries under "Queries already attempted that returned no results", do not repeat those keyword_query or semantic_query values. Either reformulate with different terminology or a broader/different filter, or return done: true if no meaningfully different query is possible.
 
@@ -196,8 +205,17 @@ Return quality: "high" if both checks pass.
 Return quality: "low" if either fails, along with:
 - reason: a concise explanation of what is wrong
 - next_task: a retrieval task that would obtain the missing or unverified information
-  - keyword_query: space-separated financial terms targeting the specific gap. All terms are AND-matched against filing text — every term must appear verbatim in the same passage or that passage is excluded. Rules: (1) use only terms that literally appear in 10-K filings; (2) never use generic descriptors like "count", "figure", "amount", "number", "data", "information" — these are rarely in filing text; (3) prefer 3–6 precise co-occurring terms over many approximate ones. Examples: headcount → "full-time employees"; gross margin → "gross profit revenue cost"; free cash flow → "operating activities capital expenditures"
+  - keyword_query: space-separated financial terms targeting the specific gap. All terms are AND-matched against filing text — every term must appear verbatim in the same passage or that passage is excluded. Rules: (1) use only terms that literally appear in 10-K filings; (2) never use generic descriptors like "count", "figure", "amount", "number", "data", "information" — these are rarely in filing text; (3) prefer 3–6 precise co-occurring terms over many approximate ones; (4) when targeting a category (e.g. reportable segments, geographic regions), do NOT enumerate specific member names absent from the original query — use the category term instead, which co-occurs with all members in headers and tables. Examples: headcount → "full-time employees"; gross margin → "gross profit revenue cost"; free cash flow → "operating activities capital expenditures"; segment revenues (names unknown) → "reportable segments revenue".
   - semantic_query: one sentence natural language question for the specific gap
-  - filter: narrow as specifically as possible (ticker, fiscal_year) — do not set section
+  - filter: narrow to ticker and fiscal_year as specifically as possible; for section —
+    null      → default; use when content could appear in more than one section or when you are not certain — different companies organise their 10-Ks differently and over-constraining silently excludes the right chunks. Only set a specific section when you are certain the content lives there exclusively.
+    "Item 1"  → business description, segments, products, strategy
+    "Item 1A" → risk factors
+    "Item 2"  → properties, facilities
+    "Item 3"  → legal proceedings
+    "Item 7"  → financial metrics: revenue, profit, margins, cash flow, debt; also liquidity and capital resources, cash and cash equivalents, marketable securities, share repurchases, dividends (any MD&A discussion of balance-sheet position or capital allocation)
+    "Item 7A" → quantitative market risk, FX, interest rate exposure
+    "Item 8"  → financial statements and notes (balance sheet, income statement, pension obligations, lease obligations, debt schedules, tax footnotes, segment footnotes)
+    "Item 11" → executive compensation
 
 Be strict but fair. Minor omissions are acceptable if the core question is answered and every stated fact is grounded in the context."""
