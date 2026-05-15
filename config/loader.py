@@ -221,6 +221,7 @@ class TracingConfig(BaseModel):
 
 
 class PromptsConfig(BaseModel):
+    source: Literal["local", "phoenix"] = "phoenix"
     tag: str | None = None  # Phoenix version tag to pull at startup; None → latest
 
 

@@ -34,7 +34,7 @@ def build_generation_pipeline(config: AppConfig, db_client: DatabaseClient, embe
     llm = build_llm(config.llm)
     filings_repo = create_filings_repo(db_client)
     retriever = build_retriever_from_config(config, db_client)
-    prompts = load_prompts(tag=config.prompts.tag)
+    prompts = load_prompts(tag=config.prompts.tag, source=config.prompts.source)
 
     return build_graph(
         analyze_query_fn=make_analyze_query(llm, prompts.analyze, filings_repo),

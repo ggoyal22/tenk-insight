@@ -45,8 +45,12 @@ class Prompts:
     versions: dict[str, str | None] = dataclasses.field(default_factory=dict)
 
 
-def load_prompts(tag: str | None = None) -> Prompts:
+def load_prompts(tag: str | None = None, source: str = "phoenix") -> Prompts:
     """Fetch all prompts from Phoenix, falling back to hardcoded constants per prompt."""
+    if source == "local":
+        logger.info("prompts.source=local — using hardcoded prompt constants")
+        return Prompts(**_DEFAULTS)
+
     base_url = os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT")
     if not base_url:
         logger.debug("OTEL_EXPORTER_OTLP_ENDPOINT not set — using hardcoded prompt constants")

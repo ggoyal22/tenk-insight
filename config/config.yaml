@@ -22,7 +22,8 @@ edgar:
   form_types:
     - "10-K"                    # add 10-Q, 8-K, etc. here as needed
   years:
-    - 2024                      # fiscal years to ingest; add more to backfill
+    # - 2024                    # fiscal years to ingest; add more to backfill
+    - 2025
   raw_data_dir: "data/raw"      # relative path; resolved to absolute at runtime
 
 
@@ -30,7 +31,7 @@ edgar:
 embedding:
   model: "BAAI/bge-large-en-v1.5"
   dimension: 1024               # must match the chosen model's output dimension
-  batch_size: 64                # number of chunks to embed per batch
+  batch_size: 16                # number of chunks to embed per batch
   device: "cpu"                 # cpu / cuda / mps (Apple Silicon)
 
 
@@ -60,7 +61,7 @@ retrieval:
     quantization: halfvec        # none | halfvec | scalar
     oversample_k: 40             # candidates fetched before float32 rescore
     # Similarity in [0, 1] — pgvector's <=> returns cosine DISTANCE; store converts: score = 1 - distance.
-    similarity_threshold: 0.0
+    similarity_threshold: 0.7
 
   keyword_search:
     enabled: true
@@ -68,9 +69,6 @@ retrieval:
     top_k: 20
     fts:                           # only read when implementation: fts
       query_mode: web              # standard | phrase | web
-    bm25:                          # only read when implementation: bm25
-      k1: 1.5                      # term frequency saturation
-      b: 0.75                      # document length normalisation
 
   fusion:
     implementation: rrf          # rrf (linear_combination future)
@@ -78,7 +76,7 @@ retrieval:
     top_k: 20                    # candidates passed to reranker
 
   reranking:
-    enabled: false               # loads a large model on startup — enable explicitly when needed
+    enabled: true               # loads a large model on startup — enable explicitly when needed
     model: "cross-encoder/ms-marco-MiniLM-L-6-v2"
     top_k: 5                     # final results returned to the LLM (only used when reranking.enabled: true)
 
@@ -97,9 +95,9 @@ llm:
 # ── Generation ────────────────────────────────────────────────────────────────
 generation:
   hyde:
-    enabled: false               # generate a hypothetical passage to improve vector retrieval
+    enabled: yes               # generate a hypothetical passage to improve vector retrieval
   hop:
-    enabled: false               # enable iterative retrieval (check_hop node); off by default
+    enabled: true               # enable iterative retrieval (check_hop node); off by default
     max_hops: 3                  # max retrieval rounds before forcing an answer
   reflection:
     enabled: false               # re-evaluate answer quality and trigger extra retrieval if needed
@@ -115,11 +113,12 @@ logging:
 
 # ── Tracing ───────────────────────────────────────────────────────────────────
 tracing:
-  enabled: false                # set true to export traces (requires OTEL_EXPORTER_OTLP_ENDPOINT in .env)
+  enabled: true                 # set true to export traces (requires OTEL_EXPORTER_OTLP_ENDPOINT in .env)
 
 
 # ── Prompts ───────────────────────────────────────────────────────────────────
 prompts:
+  source: local               # local | phoenix (phoenix falls back to local per-prompt if unavailable)
   tag:                          # Phoenix version tag to pull at startup (e.g. "production"); omit for latest
 
 
@@ -142,10 +141,9 @@ evaluation:
 
   datasets:                     # query_type groups to evaluate; empty group → warning, not error
     - single
-    - multi_hop
     - comparison
 
-  golden_path: data/golden/    # enables context_recall for single-hop traces
+  golden_path: data/golden/single_nvda_fy2025.yaml    # enables context_recall for single-hop traces
 
 
   results:

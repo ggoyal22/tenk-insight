@@ -73,7 +73,7 @@ def main() -> None:
     config = load_config()
     setup_tracing(config.tracing)
     llm = build_llm(config.llm)
-    prompts = load_prompts(tag=config.prompts.tag)
+    prompts = load_prompts(tag=config.prompts.tag, source=config.prompts.source)
 
     analyze_node = make_analyze_query(llm, prompts.analyze, _make_passthrough_filings_repo())
 
