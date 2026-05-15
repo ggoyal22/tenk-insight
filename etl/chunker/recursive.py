@@ -173,23 +173,35 @@ class RecursiveChunker(Chunker):
 
         return [c for c in out if c.strip()]
 
-    def _split_table_rows(self, markdown: str, prefix: str) -> list[str]:
-        """Split a markdown table into row-groups that each fit in child_chunk_size tokens.
+    def _split_table_rows(self, text: str, prefix: str) -> list[str]:
+        """Split a table (markdown or reformatted plain-text) into row-groups.
 
-        Each group gets the original header and separator prepended so the child
-        chunk is a valid standalone table.
+        Markdown tables: header + separator prepended to every group.
+        Reformatted plain-text (no --- separator): context line (first line)
+        prepended to every group; data rows are already self-descriptive.
         """
-        lines = markdown.strip().splitlines()
-        if len(lines) < 3:
-            return [markdown]
+        lines = text.strip().splitlines()
 
-        header, separator, *data_rows = lines
+        has_separator = len(lines) >= 3 and any("---" in l for l in lines[:3])
+        if has_separator:
+            header, separator, *data_rows = lines
+            sticky = header + "\n" + separator
+            def _make_group(rows: list[str]) -> str:
+                return sticky + "\n" + "\n".join(rows)
+        else:
+            if len(lines) < 2:
+                return [text]
+            sticky = lines[0]
+            data_rows = lines[1:]
+            def _make_group(rows: list[str]) -> str:
+                return sticky + "\n" + "\n".join(rows)
+
         prefix_tokens = self._count_tokens(prefix + "\n\n")
-        header_tokens = self._count_tokens(header + "\n" + separator)
-        available = self._config.child_chunk_size - prefix_tokens - header_tokens
+        sticky_tokens = self._count_tokens(sticky + "\n")
+        available = self._config.child_chunk_size - prefix_tokens - sticky_tokens
 
         if available <= 0:
-            return [markdown]
+            return [text]
 
         groups: list[str] = []
         current: list[str] = []
@@ -198,13 +210,13 @@ class RecursiveChunker(Chunker):
         for row in data_rows:
             row_tokens = self._count_tokens(row + "\n")
             if current_tokens + row_tokens > available and current:
-                groups.append(header + "\n" + separator + "\n" + "\n".join(current))
+                groups.append(_make_group(current))
                 current = []
                 current_tokens = 0
             current.append(row)
             current_tokens += row_tokens
 
         if current:
-            groups.append(header + "\n" + separator + "\n" + "\n".join(current))
+            groups.append(_make_group(current))
 
-        return groups or [markdown]
+        return groups or [text]
