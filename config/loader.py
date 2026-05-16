@@ -233,6 +233,7 @@ class JudgeLLMConfig(BaseModel):
     provider: Literal["openai"] = "openai"
     model: str = "gpt-4o-mini"
     api_key: SecretStr | None = None  # from JUDGE_LLM_API_KEY in .env
+    max_tokens: int = Field(gt=0, default=4096)
 
 
 class ExtractorConfig(BaseModel):

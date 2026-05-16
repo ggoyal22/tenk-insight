@@ -199,7 +199,7 @@ class RagasEvaluator(BaseEvaluator):
                     limits=httpx.Limits(max_connections=20, max_keepalive_connections=20),
                 ),
             )
-            return llm_factory(cfg.model, provider="openai", client=self._openai_client)
+            return llm_factory(cfg.model, provider="openai", client=self._openai_client, max_tokens=cfg.max_tokens)
         raise ValueError(f"Unsupported judge LLM provider: '{cfg.provider}'")
 
     def _build_embeddings(self) -> Any:
