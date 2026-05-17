@@ -35,14 +35,17 @@ class DatabaseClient(ABC):
 
     @contextmanager
     def connection(self) -> Generator[DatabaseConnection, None, None]:
-        conn = self.get_connection()
+        conn = None
         try:
+            conn = self.get_connection()
             yield conn
         except Exception:
-            conn.rollback()
+            if conn is not None:
+                conn.rollback()
             raise
         finally:
-            self.release_connection(conn)
+            if conn is not None:
+                self.release_connection(conn)
 
     @contextmanager
     @abstractmethod
