@@ -42,6 +42,7 @@ class QueryPlan(BaseModel):
 
 class HopDecision(BaseModel):
     """Structured output of the check_hop node."""
+    reasoning: str = Field(description="Scan context for sufficiency, identify gaps, and plan next query before deciding.")
     done: bool
     next_task: RetrievalTask | None = None
 
@@ -55,6 +56,7 @@ class ReflectionDecision(BaseModel):
 
 class GenerationResponse(BaseModel):
     """Structured output of the generate node."""
+    reasoning: str = Field(description="Think through query scope, granularity, chunk mapping, and completeness before writing the answer.")
     answer: str
     cited_indices: list[int]
 

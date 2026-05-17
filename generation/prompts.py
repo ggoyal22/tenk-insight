@@ -21,8 +21,9 @@ _KEYWORD_QUERY_RULES = (
     "(3) use 3–6 terms; "
     "(4) put the most specific, discriminative terms first — if the query falls back to "
     "fewer terms due to zero results, the first 3 are kept; "
-    "(5) do NOT include ticker symbols, fiscal year numbers, or form type — those are "
-    "already applied as metadata filters and waste AND slots; "
+    "(5) do NOT include ticker symbols, fiscal year numbers, form type, or specific calendar "
+    "dates/date ranges — those are already applied as metadata filters or appear naturally "
+    "in text; adding dates wastes AND slots and steers retrieval toward wrong-period chunks; "
     "(6) do NOT use hyphenated compounds — write 'full time' not 'full-time', "
     "'year over year' not 'year-over-year' (hyphens trigger strict phrase matching); "
     "(7) when targeting a category (e.g. reportable segments, geographic regions), "
@@ -44,6 +45,8 @@ _SECTION_FILTER = (
     '    "Item 1A" → risk factors\n'
     '    "Item 2"  → properties, facilities\n'
     '    "Item 3"  → legal proceedings\n'
+    '    "Item 5"  → issuer purchases of equity securities, share repurchase table, quarterly '
+    "buyback activity, average price paid per share, shares repurchased per period\n"
     '    "Item 7"  → MD&A narrative: revenue trends, margin discussion, liquidity commentary, '
     "capital allocation — qualitative discussion and year-over-year explanations; "
     "not for specific dollar amounts that live in the financial statements themselves\n"
@@ -182,17 +185,34 @@ QA_PROMPT = """You are a financial research assistant specialising in SEC 10-K f
 
 Answer the question using only the context excerpts provided. Each excerpt is numbered [N].
 
+First, fill the `reasoning` field to think through the following before writing your answer:
+1. SCOPE — What exactly is the query asking for? What company, fiscal year, time period? If the query references a fiscal quarter or named period, first scan the retrieved chunks for an explicit mention of that period label (e.g. a chunk saying "share repurchase transactions during the fourth quarter of fiscal year 2025" directly matches a query about Q4 FY2025). Use that label match as the primary anchor. Only attempt to reason about calendar date ranges if no explicit label is found in the context — and when you do, derive the range from date clues in the context itself (filing headers, table date ranges), not from general assumptions about fiscal calendars, which vary by company.
+2. GRANULARITY — Does the query use granularity language ("per period", "per segment", "by region", etc.)? If yes, note that this requests one separate value for each distinct instance — not one blended value for the overall scope. For example, "per period" means a separate value for each distinct time period in the data, not a single aggregate figure for the entire timeframe. Identify every distinct instance (period, segment, region, etc.) that falls within the query's scope and list the corresponding value for each one.
+3. CHUNK MAPPING — Which excerpts address which parts of the query? Prioritise chunks that contain an explicit period label matching the query (identified in step 1) — those are authoritative. For tables within or adjacent to such chunks, enumerate every row and its values. Only fall back to date-range matching if no explicit label match was found.
+4. COMPLETENESS — Is every part of the query covered by at least one excerpt? Note any gaps.
+5. DERIVATION CHECK — Are there any figures you would need to compute rather than quote directly? If so, mark them as unavailable. Note: figures that are labelled as computed values in the source (e.g. "average price paid per share") are directly stated — they are not derived figures even if the word "average" appears.
+
+Then produce the answer using the rules below.
+
 Rules:
 - Answer solely from the provided context. Do not use outside knowledge.
 - Include [N] inline whenever you draw from an excerpt (e.g. "Revenue was $60.9B [1]").
 - Populate cited_indices with the numbers of every excerpt you drew from.
-- Be precise and thorough. Report the exact figures from the source material and all directly relevant supporting data. Include year-over-year comparisons, percentage changes, and explanations of what drove those changes only where the context explicitly states them — do not calculate or derive figures not directly present in the source. Do not stop at the headline number — if the context explains why a metric changed, include that explanation. When the context provides a breakdown of component figures for a composite metric, include those components — do not report only the aggregate.
+- Be precise and thorough. Report the exact figures from the source material and all directly relevant supporting data. Include year-over-year comparisons, percentage changes, and explanations of what drove those changes only where the context explicitly states them. Never perform arithmetic (division, multiplication, addition, subtraction) on numbers from the context to produce a derived figure — only report values explicitly stated in the source. If a value you need is not stated verbatim in the context, say the information is not available rather than computing it. Do not stop at the headline number — if the context explains why a metric changed, include that explanation. When the context provides a breakdown of component figures for a composite metric, include those components — do not report only the aggregate. When the query asks for values at a specific granularity ("per period", "per segment", "by region", etc.), count the distinct instances in the relevant context. Your answer must contain exactly that many values — one per instance. Reporting fewer values than instances in the context is always wrong.
 - If the context does not contain sufficient information to answer, say so explicitly — do not speculate or infer."""
 
 
 COMPARISON_PROMPT = """You are a financial research assistant specialising in SEC 10-K filings.
 
 Answer the question using only the context excerpts provided. Each excerpt is numbered [N].
+
+First, fill the `reasoning` field to think through the following before writing your answer:
+1. SCOPE — What companies, fiscal years, and metrics are being compared?
+2. COVERAGE — For each company and period, which excerpts provide the required data? Note any company/period with missing data.
+3. CHUNK MAPPING — Which excerpts address which entity and metric? For any excerpt containing a table, enumerate every in-scope row.
+4. DERIVATION CHECK — Are there any figures you would need to compute rather than quote directly? If so, mark them as unavailable.
+
+Then produce the answer using the rules below.
 
 Rules:
 - Use only the provided context. Do not use outside knowledge.
@@ -208,17 +228,27 @@ Rules:
 
 CHECK_HOP_PROMPT = f"""You are reviewing retrieved context to determine whether it is sufficient to answer a financial research question.
 
-Decide: is the current context enough to produce a complete, grounded answer?
+First, fill the `reasoning` field to think through the following before deciding:
+1. SUFFICIENCY SCAN — Read each chunk in the context. Does any chunk directly contain the data needed to answer the question? List the chunks that are relevant and what they provide. If a chunk contains a table or figure that directly answers the question, the context is sufficient — stop here and set done: true.
+2. GAP IDENTIFICATION — Only if no chunk answers the question: what specific information is missing? Be concrete — name the exact figure or breakdown that is absent.
+3. NEXT QUERY PLAN — Only if a gap exists: plan the next keyword_query, semantic_query, and filter. Explicitly check: does the keyword_query contain any dates, fiscal year numbers, ticker symbols, or terms copied from wrong-period chunks? If yes, remove them.
+
+Then decide:
 
 Return done: true if the context contains sufficient information to answer the question fully.
 Return done: false with a next_task only if specific, identifiable information is clearly missing.
 
 When providing next_task:
 - keyword_query: {_KEYWORD_QUERY_RULES}
+  Exception to the category-term rule: if specific entity names (e.g. segment names, geographic region names, product line names) appear in the already-retrieved context and are directly relevant to the question, use those exact names in keyword_query — they are no longer unknown, so the category-term fallback no longer applies.
 - semantic_query: one sentence natural language question for the specific missing information
 - filter:{_FILTER_GUIDANCE}
 
+Breakdown type check: if the question asks for a specific type of financial breakdown (e.g. "reportable segment", "geographic region", "product line", "GAAP" vs "non-GAAP"), verify the retrieved data uses that exact breakdown — not a related but different one. A table titled "Revenue by End Market" does not satisfy a question about "reportable segment revenues" even if it covers the same company and period. Return done: false if the breakdown type does not match and the correct breakdown is likely to exist in a 10-K filing.
+
 If the user message lists queries under "Queries already attempted that returned no results", do not repeat those keyword_query or semantic_query values. Either reformulate with different terminology or a broader/different filter, or return done: true if no meaningfully different query is possible.
+
+Repetition guard: if prior hops have already retrieved context using the same or very similar retrieval angle and the chunks still do not answer the question, do not repeat the same approach. Adapt by changing the keyword terms, the semantic query phrasing, the section filter, or any combination of the three. If no meaningfully different reformulation is possible, return done: true.
 
 If the retrieved context contains only a cross-reference (e.g. "The information required by this Item is set forth in our Consolidated Financial Statements and Notes thereto"), the actual data is stored under a different section in this filing — retry with section: null so the search is not constrained to the section that only holds the redirect.
 

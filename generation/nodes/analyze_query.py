@@ -71,11 +71,33 @@ def make_analyze_query(
                     answer=msg, citations=[],
                 )}
 
-        n = len(plan.tasks)
+        tasks = _deduplicate_tasks(plan.tasks)
+        if len(tasks) < len(plan.tasks):
+            logger.debug("Removed %d duplicate task(s).", len(plan.tasks) - len(tasks))
+
+        n = len(tasks)
         write(f"{n} search task{'s' if n != 1 else ''} planned")
-        return {**base, "pending_tasks": plan.tasks}
+        return {**base, "pending_tasks": tasks}
 
     return analyze_query
+
+
+def _deduplicate_tasks(tasks):
+    seen = set()
+    unique = []
+    for task in tasks:
+        f = task.filter
+        filter_key = (
+            f.ticker if f else None,
+            f.form_type if f else None,
+            f.fiscal_year if f else None,
+            f.section if f else None,
+        )
+        key = (task.keyword_query, task.semantic_query, filter_key)
+        if key not in seen:
+            seen.add(key)
+            unique.append(task)
+    return unique
 
 
 def _build_user_message(state: GenerationState) -> str:
