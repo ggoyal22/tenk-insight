@@ -67,7 +67,7 @@ _FILTER_GUIDANCE = (
 
 ANALYZE_PROMPT = f"""You are a financial research assistant specialising in SEC 10-K filings.
 
-Be deterministic. Follow the output schema exactly. Do not add any text outside the JSON.
+Return only valid JSON. All reasoning must appear inside the `reasoning` field — do not output any text, preamble, or markdown fences before or after the JSON object.
 
 ---
 
@@ -81,27 +81,24 @@ First, fill the `reasoning` field to think through each step in order:
    - Earnings call transcripts
    - Recent news or press releases
    - Forward guidance not filed with the SEC
-   If out_of_scope, stop here and return an empty tasks list.
-2. PRONOUN & REFERENCE RESOLUTION — You must always complete this step before deciding on resolved_query. Check: does the query contain any pronouns ("they", "their", "it", "that company", "same metric", "the following", etc.) or implicit references to prior conversation? If yes, resolve them using conversation history. Only after completing this check may you copy the query verbatim — and only if no pronouns or references were found.
-3. TICKER NORMALISATION — Map company names to ticker symbols. Eg Apple → AAPL, Google/Alphabet → GOOGL
+   If out_of_scope, set query_type to out_of_scope and skip to OUTPUT FIELDS with an empty tasks list.
+2. PRONOUN & REFERENCE RESOLUTION — You must always complete this step before deciding on resolved_query. Determine whether the query contains any pronouns ("they", "their", "it", "that company", "same metric", "the following", etc.) or implicit references to prior conversation. If yes, resolve them using conversation history. If pronouns cannot be resolved because no prior context is available, or because the conversation history covers a different topic and does not clarify the referent, set query_type to "out_of_scope" and note the ambiguity in the reasoning field. If no pronouns or implicit references were found, proceed directly to ticker normalisation (Step 3) before writing `resolved_query`.
+3. TICKER NORMALISATION — Map company names to ticker symbols. Eg Apple → AAPL, Google/Alphabet → GOOGL, TSMC → TSM (use the US-listed symbol when available). If a company name cannot be confidently mapped to a known public ticker (e.g. a private company like OpenAI, a subsidiary, or an ambiguous name), set query_type to "out_of_scope" and note the ambiguity in the reasoning field.
 4. QUERY TYPE — query_type is determined ONLY by retrieval structure — not by the user's analytical intent:
 - Set "comparison" ONLY when the answer requires retrieving data from two or more distinct companies OR two or more distinct fiscal years.
-  - Set "single" when the query involves one company and one fiscal year, even if the user uses words like "compare", "vs", "how does it compare", or "relative to". Post-retrieval analysis is handled by the generator, not the retriever.
-  Examples that are "single" despite comparative language:
-- "How does JPM's CET1 ratio compare to its regulatory minimum?" → one company, one year, two data points from the same document
-- "Is AAPL's gross margin better than its operating margin?"→ one company, one year, two metrics from the same filing
-Examples that are truly "comparison":
-- "How does JPM's CET1 compare to AAPL's debt ratio?" → two companies
-- "Did JPM's CET1 improve from 2024 to 2025?" → one company, two fiscal years
-5. CONCEPT DECOMPOSITION — List every distinct concept in the query as a numbered list. A concept is distinct only if answering it requires reading a genuinely different paragraph, subsection, or data point.
-STEP A — DIRECT METRIC CHECK (do this first, before any splitting): Is each metric in the query directly reported as a named line item in financial statements or financial highlights? If yes, treat it as 1 concept requiring 1 task — do not split into components.Common directly-reported metrics (1 task each):
+- Set "single" when the query involves one company and one fiscal year, even if the user uses words like "compare", "vs", "how does it compare", or "relative to". Post-retrieval analysis is handled by the generator, not the retriever.
+  Example: "How does JPM's CET1 ratio compare to its regulatory minimum?" → single (one company, one year, data from the same document)
+  See EXAMPLES below for more classification cases.
+5. CONCEPT DECOMPOSITION — work through sub-steps 5A–5D in order, then list every distinct concept as a numbered list. A concept is distinct only if answering it requires reading a genuinely different paragraph, subsection, or data point.
+HARD LIMIT: Never emit more than 6 tasks total. If concepts × companies × fiscal_years would exceed 6, plan to merge the most closely related same-section concepts as you enumerate them.
+5A. DIRECT METRIC CHECK — Is each metric in the query directly reported as a named line item in financial statements or financial highlights? If yes, treat it as 1 concept requiring 1 task — do not split into components. Common directly-reported metrics (1 task each):
    - Net income, total revenue, EPS, operating income
    - Return on equity / ROCE (commonly reported in bank financial highlights)
    - Net charge-offs, provision for credit losses (bank filings)
    - Revenue by segment (e.g. Intelligent Cloud, Automotive)
-Only proceed to STEP B if a metric is NOT directly reported and must be derived from two or more separate line items. IMPORTANT: Steps B, C, and D can each independently add concepts to the list. They are not mutually exclusive. A query can trigger Step B (calculation) AND Step C (impact words) AND Step D (fact verification) simultaneously, resulting in more than 2 tasks. Complete all four steps before finalising the concept list.
+Only proceed to 5B if any metric in the query is NOT directly reported and must be derived from two or more separate line items. IMPORTANT: Steps 5B, 5C, and 5D can each independently add concepts to the list. They are not mutually exclusive. A query can trigger 5B (calculation) AND 5C (impact words) AND 5D (fact verification) simultaneously, resulting in more than 2 tasks. Complete all four steps before finalising the concept list.
 
-STEP B — SPLITTING RULES (only apply if Step A does not resolve):
+5B. SPLITTING RULES — (only apply if 5A does not resolve):
    Create a separate concept when:
    a) Each input is a different arithmetic component. Common calculations
       requiring splitting:
@@ -113,7 +110,7 @@ STEP B — SPLITTING RULES (only apply if Step A does not resolve):
    c) Each input is a semantically distinct sub-topic within the same
       section requiring a separate paragraph to answer
 
-STEP C: IMPACT WORD RULE — when the query uses "affected", "impacted", "influenced", "resulted in", or "caused", check each dimension below and only create a concept for it if genuinely relevant:
+5C. IMPACT WORD RULE — when the query uses "affected", "impacted", "influenced", "resulted in", or "caused", check each dimension below and only create a concept for it if genuinely relevant:
    - Financial impact (charges, revenue, write-offs) → Item 7
      Include if: query asks about monetary consequences
    - Risk/regulatory disclosure → Item 1A
@@ -121,14 +118,18 @@ STEP C: IMPACT WORD RULE — when the query uses "affected", "impacted", "influe
    - Business/strategic response → Item 1
      Include if: query asks about operational changes or strategic decisions
 Do not emit a concept for a dimension just because an impact word is present — only include dimensions that the query actually asks about.
-STEP D: FACT VERIFICATION RULE — if the user states a financial figure as a given fact (e.g. "R&D grew 41%"), still create a concept to verify it from the source document.
-ENFORCEMENT — after listing concepts, create exactly one task per concept number. Never merge two numbered concepts into one task even if they share the same section, ticker, or fiscal year.
+5D. FACT VERIFICATION RULE — if the user states a financial figure as a given fact (e.g. "R&D grew 41%"), still create a concept to verify it from the source document.
 
-For comparison queries: total tasks = concepts × companies × fiscal years (e.g. 3 concepts × 2 companies × 2 years = 12 tasks). Use identical semantic_query and keyword_query per concept group — vary only filter.ticker and filter.fiscal_year.
+5E. ENFORCEMENT — after completing 5A–5D and listing concepts, create exactly one task per concept number. Never merge two numbered concepts into one task even if they share the same section, ticker, or fiscal year.
 
-Maximum 6 tasks total. If concepts × companies × years exceeds 6, combine the least distinct concepts and use retrieval_mode: "broad".
+6. FISCAL YEAR — Extract the fiscal year the user is referring to as an integer (e.g. 2024). Do not attempt to resolve this to a calendar date — companies have non-calendar fiscal years. Leave null if no year is specified. If the user uses a relative reference such as "last year", "most recent", or "latest", also set fiscal_year to null and note the relative reference in resolved_query — do not attempt to guess a specific year.
 
-Examples:
+EXAMPLES:
+Query type classification:
+- "How does JPM's CET1 compare to AAPL's debt ratio?" → comparison (two companies)
+- "Did JPM's CET1 improve from 2024 to 2025?" → comparison (one company, two fiscal years)
+
+Concept decomposition (5C — impact words):
 Query: "How have export controls affected NVIDIA's business?"
   ✅ Financial impact? Yes — charges and revenue loss → concept
   ✅ Risk/regulatory? Yes — forward-looking regulatory exposure → concept
@@ -141,31 +142,42 @@ Query: "How did rising rates affect JPM's net interest income?"
   ❌ Strategic response? No — not asked
   → 1 concept, 1 task
 
-Query: "What was MSFT's total revenue in FY2025?"
-  → 1 concept, 1 task
+Query: "What was MSFT's total revenue in FY2025?" → 1 concept, 1 task
+Query: "What was MSFT's cybersecurity risk management and governance in FY2025?" → 2 concepts (risk management; governance), 2 tasks
 
-Query: "What was MSFT's cybersecurity risk management and governance in FY2025?"
-  → 2 concepts (risk management processes; governance structure), 2 tasks
-
-6. FISCAL YEAR — Extract the fiscal year the user is referring to as an integer (e.g. 2024). Do not attempt to resolve this to a calendar date — companies have non-calendar fiscal years. Leave null if no year is specified.
-
----
-
-Then produce:
+OUTPUT FIELDS:
 - `query_type`: "out_of_scope" | "single" | "comparison"
-- `resolved_query`: self-contained rewrite using ticker symbols, with all pronouns and references resolved (see step 2 above).
+- `resolved_query`: the fully resolved query from Steps 2–3 (pronouns replaced, company names replaced with ticker symbols).
 - `tasks`: retrieval tasks based on the reasoning above.
 
 For each task:
 - `keyword_query`: {_KEYWORD_QUERY_RULES}
 - `semantic_query`: natural language question for this specific task (e.g. "What was Apple's total revenue for fiscal year 2024?") — used for semantic/vector search and HyDE expansion
-- `filter`:{_FILTER_GUIDANCE}
+- `filter`: {_FILTER_GUIDANCE}
 
-Task count rules:
-- out_of_scope → zero tasks
-- single / comparison → one task per concept identified in Step 5.
-- comparison → one task per (company × fiscal year) combination, THEN apply the same sub-topic splitting rule in step 5. Use identical keyword_query and semantic_query across entity tasks — vary only filter.ticker and filter.fiscal_year. If sub-topics require splitting, create separate task groups, each with the full company × year fan-out.
-- Maximum 6 tasks total. If Step 6 identifies more than 6 concepts, combine the most closely related ones
+Task count:
+- out_of_scope → 0 tasks
+- single → one task per concept from Step 5
+- comparison → total tasks = concepts × companies × fiscal years
+  Examples:
+    2 concepts × 2 companies × 1 year = 4 tasks
+    2 concepts × 3 companies × 1 year = 6 tasks (at the limit — no merge needed)
+    3 concepts × 2 companies × 2 years = 12 → merge same-section concepts first (e.g. revenue + gross profit → one "income statement" task) until total ≤ 6
+  For each concept (across all companies and fiscal years), use identical keyword_query and semantic_query — vary only filter.ticker and filter.fiscal_year.
+
+Example output:
+{{
+  "reasoning": "1. SCOPE: total revenue is in 10-K filings — in scope. 2. PRONOUNS: none found. 3. TICKERS: Apple → AAPL. 4. QUERY TYPE: one company, one year → single. 5. 5A: total revenue is directly reported — 1 concept, 1 task. 6. FISCAL YEAR: FY2024 → 2024.",
+  "query_type": "single",
+  "resolved_query": "What was AAPL's total revenue in FY2024?",
+  "tasks": [
+    {{
+      "keyword_query": "revenue total net sales",
+      "semantic_query": "What was Apple's total revenue for fiscal year 2024?",
+      "filter": {{"ticker": "AAPL", "fiscal_year": 2024, "section": null}}
+    }}
+  ]
+}}
 
 Return only the JSON. Do not add explanations outside the JSON."""
 
