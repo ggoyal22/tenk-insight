@@ -34,32 +34,34 @@ _KEYWORD_QUERY_RULES = (
     'segment revenues (names unknown) → "reportable segments revenue".'
 )
 
-_SECTION_FILTER = (
+
+_FILTER_FIELDS = (
+    "\n"
+    "  - ticker: company ticker symbol\n"
+    "  - fiscal_year: integer fiscal year (e.g. 2024), null if unspecified\n"
+    "  - section: JSON null by default — apply a specific item only when certain the content\n"
+    "    lives there (see Section Labels below).\n"
+    "    IMPORTANT: the value must be JSON null, never the string \"null\".\n"
+)
+
+_SECTION_LABELS = (
+    "\nSection Labels (domestic 10-K filers only)\n"
     "null      → default; use when content could appear in more than one section, when you "
     "are not certain, or when looking for specific financial statement figures (segment revenue "
     "tables, balance sheet line items, note disclosures, EPS, debt or lease schedules) — "
     "companies vary widely in which item they file financial statements under (Item 8, Item 15, "
-    "Item 16, etc.), so null avoids silently excluding the right chunks. "
-    "Always write JSON null, never the string \"null\".\n"
-    '    "Item 1"  → business description, segments, products, strategy\n'
-    '    "Item 1A" → risk factors\n'
-    '    "Item 2"  → properties, facilities\n'
-    '    "Item 3"  → legal proceedings\n'
-    '    "Item 5"  → issuer purchases of equity securities, share repurchase table, quarterly '
+    "Item 16, etc.)\n"
+    '"Item 1"  → business description, segments, products, strategy\n'
+    '"Item 1A" → risk factors\n'
+    '"Item 2"  → properties, facilities\n'
+    '"Item 3"  → legal proceedings\n'
+    '"Item 5"  → issuer purchases of equity securities, share repurchase table, quarterly '
     "buyback activity, average price paid per share, shares repurchased per period\n"
-    '    "Item 7"  → MD&A narrative: revenue trends, margin discussion, liquidity commentary, '
+    '"Item 7"  → MD&A narrative: revenue trends, margin discussion, liquidity commentary, '
     "capital allocation — qualitative discussion and year-over-year explanations; "
     "not for specific dollar amounts that live in the financial statements themselves\n"
-    '    "Item 7A" → quantitative market risk, FX, interest rate exposure\n'
-    '    "Item 11" → executive compensation'
-)
-
-_FILTER_GUIDANCE = (
-    "\n"
-    "  - ticker: company ticker symbol\n"
-    "  - fiscal_year: integer fiscal year (e.g. 2024), null if unspecified\n"
-    f"  - section:\n"
-    f"      {_SECTION_FILTER}"
+    '"Item 7A" → quantitative market risk, FX, interest rate exposure\n'
+    '"Item 11" → executive compensation'
 )
 
 
@@ -153,7 +155,7 @@ OUTPUT FIELDS:
 For each task:
 - `keyword_query`: {_KEYWORD_QUERY_RULES}
 - `semantic_query`: natural language question for this specific task (e.g. "What was Apple's total revenue for fiscal year 2024?") — used for semantic/vector search and HyDE expansion
-- `filter`: {_FILTER_GUIDANCE}
+- `filter`: {_FILTER_FIELDS}{_SECTION_LABELS}
 
 Task count:
 - out_of_scope → 0 tasks
@@ -240,31 +242,67 @@ Rules:
 
 CHECK_HOP_PROMPT = f"""You are reviewing retrieved context to determine whether it is sufficient to answer a financial research question.
 
-First, fill the `reasoning` field to think through the following before deciding:
-1. SUFFICIENCY SCAN — Read each chunk in the context. Does any chunk directly contain the data needed to answer the question? List the chunks that are relevant and what they provide. If a chunk contains a table or figure that directly answers the question, the context is sufficient — stop here and set done: true.
-2. GAP IDENTIFICATION — Only if no chunk answers the question: what specific information is missing? Be concrete — name the exact figure or breakdown that is absent.
-3. NEXT QUERY PLAN — Only if a gap exists: plan the next keyword_query, semantic_query, and filter. Explicitly check: does the keyword_query contain any dates, fiscal year numbers, ticker symbols, or terms copied from wrong-period chunks? If yes, remove them.
+Return a JSON object with exactly these fields:
+{{
+  "reasoning": "<string>",
+  "done": <boolean>,
+  "next_task": {{           // omit entirely when done is true
+    "keyword_query": "<string>",
+    "semantic_query": "<string>",
+    "filter": {{
+      "ticker": "<string|null>",
+      "fiscal_year": <integer|null>,
+      "section": "<string>" | null
+    }}
+  }}
+}}
+Omit `next_task` entirely when `done` is true. Return only the JSON object — no text, preamble, or markdown fences before or after.
 
-Then decide:
+Complete all reasoning steps inside the `reasoning` field before writing `done`. The value of `done` must follow from the completed reasoning — do not finalize it before finishing each step.
 
-Return done: true if the context contains sufficient information to answer the question fully.
-Return done: false with a next_task only if specific, identifiable information is clearly missing.
+---
 
-When providing next_task:
+If the context is empty (no chunks were retrieved), set done: false and construct a first retrieval query based solely on the question.
+
+LOOP GUARD — Never emit a keyword_query or semantic_query that is verbatim or near-verbatim identical to any query in the current context or "Queries already attempted" list. Change at least one of: keyword terms, semantic phrasing, or section filter. If no meaningfully different reformulation is possible, set done: true.
+
+1. SUFFICIENCY SCAN — List each chunk that is relevant to the question and what it provides. Note two special cases:
+   - Cross-reference chunks: if a chunk contains only a redirect (e.g. "The information required by this Item is set forth in our Consolidated Financial Statements and Notes thereto"), it does not count as sufficient — treat as a gap and plan a retry with section: null.
+   - Conflicting chunks: if multiple chunks report different values for the same metric, note the conflict and treat as a gap.
+
+2. BREAKDOWN TYPE CHECK — If the question specifies a breakdown type (e.g. "reportable segment", "geographic region", "product line", "GAAP" vs "non-GAAP"), verify the retrieved data uses that exact breakdown — not a related but different one. A table titled "Revenue by End Market" does not satisfy a question about "reportable segment revenues" even if it covers the same company and period — breakdown type mismatch. A table titled "Revenue by Reportable Segment" does satisfy — breakdown label matches exactly. If the breakdown does not match and the correct breakdown is likely to exist in a 10-K filing, treat as a gap. If retrieved context confirms the company does not report by that breakdown type, set done: true and note in reasoning that the breakdown is unavailable.
+
+3. GAP IDENTIFICATION — Only if step 1 or 2 reveals a gap: state the missing item as "[Metric] for [entity] for [period] is not present in any chunk." One sentence per gap.
+
+4. NEXT QUERY PLAN — Only if a gap exists: plan the next retrieval query. Apply the LOOP GUARD above before finalising.
+   - Before returning, remove any dates, fiscal year numbers, ticker symbols, or terms that appear in retrieved chunks from a different fiscal year or company than the gap you are trying to fill.
+
+5. DECISION — Set done: true if steps 1 and 2 reveal no gaps, or if any identified gap cannot be retrieved from a 10-K filing. Set done: false only when a concrete, named gap exists and the missing data is retrievable from a 10-K filing. Never treat inferred, estimated, or extrapolated figures as sufficient — only directly stated figures count as sufficient for this check. When done is true, omit next_task entirely.
+
+---
+{_SECTION_LABELS}
+
+When done is false, populate next_task:
 - keyword_query: {_KEYWORD_QUERY_RULES}
-  Exception to the category-term rule: if specific entity names (e.g. segment names, geographic region names, product line names) appear in the already-retrieved context and are directly relevant to the question, use those exact names in keyword_query — they are no longer unknown, so the category-term fallback no longer applies.
+  Exception: if specific entity names (e.g. segment names, geographic region names, product line names) already appear in the retrieved context and are directly relevant to the question, use those exact names — the category-term rule does not apply when specific member names are already known from retrieved context.
 - semantic_query: one sentence natural language question for the specific missing information
-- filter:{_FILTER_GUIDANCE}
+- filter:{_FILTER_FIELDS}  Use only ticker symbols and fiscal years that appear in the question or retrieved context — do not invent values. section must be one of the values in Section Labels above or JSON null — never invent a label.
 
-Breakdown type check: if the question asks for a specific type of financial breakdown (e.g. "reportable segment", "geographic region", "product line", "GAAP" vs "non-GAAP"), verify the retrieved data uses that exact breakdown — not a related but different one. A table titled "Revenue by End Market" does not satisfy a question about "reportable segment revenues" even if it covers the same company and period. Return done: false if the breakdown type does not match and the correct breakdown is likely to exist in a 10-K filing.
+Examples:
 
-If the user message lists queries under "Queries already attempted that returned no results", do not repeat those keyword_query or semantic_query values. Either reformulate with different terminology or a broader/different filter, or return done: true if no meaningfully different query is possible.
+Segment revenue gap (null section, unknown members):
+{{
+  "keyword_query": "reportable segments revenue operating income",
+  "semantic_query": "What were revenues and operating income by reportable segment?",
+  "filter": {{"ticker": "AAPL", "fiscal_year": 2024, "section": null}}
+}}
 
-Repetition guard: if prior hops have already retrieved context using the same or very similar retrieval angle and the chunks still do not answer the question, do not repeat the same approach. Adapt by changing the keyword terms, the semantic query phrasing, the section filter, or any combination of the three. If no meaningfully different reformulation is possible, return done: true.
-
-If the retrieved context contains only a cross-reference (e.g. "The information required by this Item is set forth in our Consolidated Financial Statements and Notes thereto"), the actual data is stored under a different section in this filing — retry with section: null so the search is not constrained to the section that only holds the redirect.
-
-Default to done: true. Only request further retrieval if the gap is concrete and the missing information is likely to exist in a 10-K filing."""
+Cross-reference chunk — retry with section: null:
+{{
+  "keyword_query": "total assets liabilities stockholders equity",
+  "semantic_query": "What were total assets, liabilities, and stockholders equity on the balance sheet?",
+  "filter": {{"ticker": "MSFT", "fiscal_year": 2024, "section": null}}
+}}"""
 
 
 # ── Reflection ────────────────────────────────────────────────────────────────
@@ -282,6 +320,6 @@ Return quality: "low" if either fails, along with:
 - next_task: a retrieval task that would obtain the missing or unverified information
   - keyword_query: {_KEYWORD_QUERY_RULES}
   - semantic_query: one sentence natural language question for the specific gap
-  - filter:{_FILTER_GUIDANCE}
+  - filter:{_FILTER_FIELDS}{_SECTION_LABELS}
 
 Be strict but fair. Minor omissions are acceptable if the core question is answered and every stated fact is grounded in the context."""
