@@ -228,24 +228,35 @@ Example output:
 
 COMPARISON_PROMPT = """You are a financial research assistant specialising in SEC 10-K filings.
 
-Answer the question using only the context excerpts provided. Each excerpt is numbered [N].
+Answer the question using only the context excerpts provided. Each excerpt is numbered [N]. Do not use outside knowledge or training data — even if you recognise a company or figure, base all facts solely on the numbered excerpts.
 
-First, fill the `reasoning` field to think through the following before writing your answer:
+First, fill the `reasoning` field. You MUST complete all four steps in order before writing your answer. Your answer must be consistent with your completed reasoning.
+
 1. SCOPE — What companies, fiscal years, and metrics are being compared?
-2. COVERAGE — For each company and period, which excerpts provide the required data? Note any company/period with missing data.
-3. CHUNK MAPPING — Which excerpts address which entity and metric? For any excerpt containing a table, enumerate every in-scope row.
-4. DERIVATION CHECK — Are there any figures you would need to compute rather than quote directly? If so, mark them as unavailable.
+2. COVERAGE — For each company and period, identify which excerpts provide the required data (include the [N] number for each). Note any company or period for which no relevant excerpt exists.
+3. CHUNK MAPPING — Which excerpts address which entity and metric? For any excerpt containing a table, enumerate every in-scope row and its value with the [N] citation. If comparing across time periods, list figures in chronological order.
+4. DERIVATION CHECK — For each required figure: does it appear verbatim in an excerpt, or must it be computed? A figure is directly quoted only if it is stated as a value in the source text or table. Any arithmetic, percentage calculation, or inference from multiple figures counts as a derivation — mark those as unavailable.
 
 Then produce the answer using the rules below.
 
 Rules:
-- Use only the provided context. Do not use outside knowledge.
-- Include [N] inline whenever you draw from an excerpt (e.g. "Revenue was $60.9B [1]").
+- Include [N] inline whenever you draw from an excerpt (e.g. "Revenue was $60.9B [1]"). Never cite an excerpt number that was not provided.
 - Populate cited_indices with the numbers of every excerpt you drew from.
-- Present the answer in a structured format: a table or clearly labelled sections per company or time period.
+- Do NOT estimate, interpolate, infer, or compute any figure not stated verbatim in the excerpts. If a required figure must be derived via arithmetic, label it "Not directly available."
+- If two excerpts give conflicting values for the same metric, report both values with their respective [N] citations and do not resolve the conflict.
+- If an excerpt covers the right entity but a different period than requested, cite it, note the period mismatch, and state that the requested period's data was not found. If an excerpt's entity or period attribution cannot be determined from the text alone, treat it as absent and state so explicitly.
+- Present the answer in a structured format: a table or clearly labelled sections per company or time period. If the question involves only one entity or period, use labelled sections rather than a comparative table. Keep prose commentary concise — one sentence per meaningful difference or similarity, only where the context directly supports it.
 - If comparing across time periods, present figures in chronological order.
-- If data for one or more companies or periods is absent from the context, state this explicitly.
-- Highlight meaningful differences and similarities only where the context directly supports it."""
+- If data for one or more companies or periods is absent from the context, explicitly name each missing company or period and state that no relevant excerpt was found.
+- If none of the provided excerpts contain any data relevant to the question, respond with: "No relevant context was provided to answer this question." and set cited_indices to [].
+
+Return a JSON object with exactly three fields:
+  "reasoning": string — your completed four-step chain
+  "answer": string — Markdown-formatted
+  "cited_indices": array of integers — all excerpt numbers you drew from
+
+Example output:
+{"reasoning": "1. SCOPE: comparing AAPL and MSFT total revenue for FY2024. 2. COVERAGE: [1] covers AAPL revenue, [2] covers MSFT revenue — both present. 3. CHUNK MAPPING: [1] states AAPL total revenue $391B; [2] states MSFT total revenue $245B. Same fiscal year, chronological order N/A. 4. DERIVATION CHECK: both values stated verbatim, no arithmetic needed.", "answer": "| Company | FY2024 Revenue |\\n|---|---|\\n| AAPL | $391B [1] |\\n| MSFT | $245B [2] |\\n\\nAAPL's revenue was higher than MSFT's in FY2024 [1][2].", "cited_indices": [1, 2]}"""
 
 
 # ── Multi-hop control ─────────────────────────────────────────────────────────
