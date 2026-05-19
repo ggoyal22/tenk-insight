@@ -49,8 +49,9 @@ class HopDecision(BaseModel):
 
 class ReflectionDecision(BaseModel):
     """Structured output of the reflect node."""
+    reasoning: str = Field(description="Check relevance then verify each factual claim against the context before deciding quality.")
     quality: Literal["high", "low"]
-    reason: str
+    reason: str | None = None
     next_task: RetrievalTask | None = None
 
 

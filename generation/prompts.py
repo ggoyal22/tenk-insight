@@ -330,17 +330,47 @@ Cross-reference chunk — retry with section: null:
 
 REFLECTION_PROMPT = f"""You are a quality reviewer evaluating an answer generated from SEC 10-K filings.
 
-You will receive the original question, the generated answer, and the context excerpts used. Assess two things:
+You will receive the original question, the generated answer, and the context excerpts used.
 
-1. Relevance  — does the answer directly address what was asked?
-2. Grounding  — is every factual claim in the answer supported by the provided context?
+Return a JSON object:
+  reasoning: scratchpad — work through relevance then grounding before setting quality
+  quality  : "high" if both checks pass, "low" if either fails
+  reason   : concise explanation of the failure — null when quality is "high"
+  next_task: retrieval task that would resolve the gap — null when quality is "high"
 
-Return quality: "high" if both checks pass.
-Return quality: "low" if either fails, along with:
-- reason: a concise explanation of what is wrong
-- next_task: a retrieval task that would obtain the missing or unverified information
-  - keyword_query: {_KEYWORD_QUERY_RULES}
-  - semantic_query: one sentence natural language question for the specific gap
-  - filter:{_FILTER_FIELDS}{_SECTION_LABELS}
+Check in order:
+1. Relevance — does the answer directly address what was asked?
+2. Grounding — does every specific figure, named entity, and affirmative factual claim in the answer trace to at least one provided context excerpt?
 
-Be strict but fair. Minor omissions are acceptable if the core question is answered and every stated fact is grounded in the context."""
+If no context excerpts are provided or all are unrelated to the question, treat grounding as failed.
+
+When quality is "low", populate next_task:
+  keyword_query : {_KEYWORD_QUERY_RULES}
+  semantic_query: one sentence natural language question targeting the specific gap
+  hyde_query    : null
+  filter        :{_FILTER_FIELDS}{_SECTION_LABELS}
+
+---
+
+Example (quality: low)
+
+Question: What was NVIDIA's gross margin in fiscal year 2024?
+Answer: NVIDIA's gross margin was 72.7% in fiscal 2024, driven by data center demand.
+Context: [Item 7] "Gross margin increased to 56.9% for fiscal year 2024..."
+
+Output:
+{{
+  "reasoning": "Relevance: yes, the answer addresses gross margin directly. Grounding: the answer states 72.7% but the context shows 56.9% — this specific figure is not supported by the excerpt.",
+  "quality": "low",
+  "reason": "Answer states 72.7% but context shows 56.9% — the specific figure is ungrounded.",
+  "next_task": {{
+    "keyword_query": "gross margin gross profit revenue cost",
+    "semantic_query": "What was NVIDIA's gross margin percentage in fiscal year 2024?",
+    "hyde_query": null,
+    "filter": {{"ticker": "NVDA", "fiscal_year": 2024, "section": null}}
+  }}
+}}
+
+---
+
+Be strict but fair. Minor phrasing differences are acceptable; any specific figure, named entity, or dated fact not present in the context must fail grounding."""
