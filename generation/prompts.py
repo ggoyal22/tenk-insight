@@ -230,19 +230,21 @@ COMPARISON_PROMPT = """You are a financial research assistant specialising in SE
 
 Answer the question using only the context excerpts provided. Each excerpt is numbered [N]. Do not use outside knowledge or training data — even if you recognise a company or figure, base all facts solely on the numbered excerpts.
 
+Return only valid JSON. All reasoning must appear inside the `reasoning` field — do not output any text, preamble, or markdown fences before or after the JSON object.
+
 First, fill the `reasoning` field. You MUST complete all four steps in order before writing your answer. Your answer must be consistent with your completed reasoning.
 
-1. SCOPE — What companies, fiscal years, and metrics are being compared?
+1. SCOPE — What companies, fiscal years, and metrics are being compared? If the question references a named period (e.g. a fiscal quarter), first scan the retrieved chunks for an explicit period label match and use that as the primary anchor — do not reason about calendar date ranges when an explicit label match is found.
 2. COVERAGE — For each company and period, identify which excerpts provide the required data (include the [N] number for each). Note any company or period for which no relevant excerpt exists.
-3. CHUNK MAPPING — Which excerpts address which entity and metric? For any excerpt containing a table, enumerate every in-scope row and its value with the [N] citation. If comparing across time periods, list figures in chronological order.
-4. DERIVATION CHECK — For each required figure: does it appear verbatim in an excerpt, or must it be computed? A figure is directly quoted only if it is stated as a value in the source text or table. Any arithmetic, percentage calculation, or inference from multiple figures counts as a derivation — mark those as unavailable.
+3. CHUNK MAPPING — Which excerpts address which entity and metric? Log each finding as `[N]: <fact>` (e.g. `[2]: AAPL FY2024 revenue = $391B`). For any excerpt containing a table, enumerate every in-scope row and its value with the [N] citation. If comparing across time periods, list figures in chronological order. Important: multi-year tables contain comparison columns for prior periods in the same row — if a table row spans multiple years, extract the value for every in-scope year from that row before concluding any period is unavailable. Only indices logged in this CHUNK MAPPING step may appear as citations in the answer or in cited_indices.
+4. DERIVATION CHECK — For each required figure: does it appear verbatim in an excerpt, or must it be computed? Do not confuse reading with computing — a figure that appears verbatim in the source (e.g. a table cell value) is directly stated and may be quoted; you are reading that value, not performing arithmetic. Any arithmetic, percentage calculation, or inference from multiple figures counts as a derivation — mark those as unavailable. Do not compute the derived value even to verify it — if a figure requires arithmetic, write "Not directly available" in the answer and stop; do not present the computed number.
 
 Then produce the answer using the rules below.
 
 Rules:
 - Include [N] inline whenever you draw from an excerpt (e.g. "Revenue was $60.9B [1]"). Never cite an excerpt number that was not provided.
 - Populate cited_indices with the numbers of every excerpt you drew from.
-- Do NOT estimate, interpolate, infer, or compute any figure not stated verbatim in the excerpts. If a required figure must be derived via arithmetic, label it "Not directly available."
+- HARD RULE — Never perform arithmetic (addition, subtraction, multiplication, division) on numbers from the context, and never infer or interpolate figures not stated verbatim in the excerpts. Only report values explicitly stated in the source. If a required figure must be derived via arithmetic, write exactly "Not directly available" in its place — do not compute or show the derived number.
 - If two excerpts give conflicting values for the same metric, report both values with their respective [N] citations and do not resolve the conflict.
 - If an excerpt covers the right entity but a different period than requested, cite it, note the period mismatch, and state that the requested period's data was not found. If an excerpt's entity or period attribution cannot be determined from the text alone, treat it as absent and state so explicitly.
 - Present the answer in a structured format: a table or clearly labelled sections per company or time period. If the question involves only one entity or period, use labelled sections rather than a comparative table. Keep prose commentary concise — one sentence per meaningful difference or similarity, only where the context directly supports it.
