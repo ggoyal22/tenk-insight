@@ -95,7 +95,7 @@ llm:
 # ── Generation ────────────────────────────────────────────────────────────────
 generation:
   hyde:
-    enabled: yes               # generate a hypothetical passage to improve vector retrieval
+    enabled: no               # generate a hypothetical passage to improve vector retrieval
   hop:
     enabled: true               # enable iterative retrieval (check_hop node); off by default
     max_hops: 3                  # max retrieval rounds before forcing an answer
@@ -135,7 +135,7 @@ evaluation:
 
   metrics:
     - faithfulness
-    - answer_relevancy
+    - answer_correctness        # skipped automatically when golden_path is not set
     - context_precision
     - context_recall            # skipped automatically when golden_path is not set
 
@@ -143,7 +143,8 @@ evaluation:
     - single
     - comparison
 
-  golden_path: data/golden/single_nvda_fy2025.yaml    # enables context_recall for single-hop traces
+  golden_path:               # path to a YAML file or directory with ground-truth Q&A pairs;
+                             # enables reference-required metrics (context_recall, answer_correctness)
 
 
   results:
