@@ -8,12 +8,8 @@
 *.env
 !.env.example
 
-# Raw filing data — large files, reproducible by re-running ingestion
-data/raw/
-
-# Evaluation run artifacts — generated outputs, not source-controlled
-data/eval/
-data/eval_results/
+# All data — raw filings, golden datasets, and eval artifacts are managed separately
+data/
 
 # Python
 __pycache__/
@@ -42,6 +38,9 @@ dist/
 # IDE
 .vscode/
 .idea/
+
+# Claude Code internal workflows — not for public consumption
+.claude/
 
 # Editor swap/temp files
 *.swp
