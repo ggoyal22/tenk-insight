@@ -51,11 +51,11 @@ def make_analyze_query(
                 citations=[],
             )}
 
-        tickers = [
+        tickers = list(dict.fromkeys(
             t.filter.ticker.upper()
             for t in plan.tasks
             if t.filter and t.filter.ticker
-        ]
+        ))
         if tickers:
             missing = [t for t in tickers if not filings_repo.list_ids({"ticker": t})]
             if missing:
