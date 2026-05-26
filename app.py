@@ -21,6 +21,7 @@ from db.repositories.feedback import FeedbackRepo
 from etl.factory import create_embedder
 from generation.factory import build_generation_pipeline, make_initial_state
 from generation.types import Citation, GenerationResult, total_pipeline_usage
+from llm.pricing import compute_cost
 from llm.types import LLMUsage, Message
 from tracing.setup import setup_tracing
 
@@ -108,7 +109,7 @@ def render_feedback(msg_index: int, query: str, answer: str, repo: FeedbackRepo)
             st.rerun()
 
 
-def submit_query(query: str, graph, feedback_repo: FeedbackRepo) -> None:
+def submit_query(query: str, graph, config, feedback_repo: FeedbackRepo) -> None:
     st.session_state.messages.append({"role": "user", "content": query})
     with st.chat_message("user"):
         st.markdown(query)
@@ -145,10 +146,16 @@ def submit_query(query: str, graph, feedback_repo: FeedbackRepo) -> None:
             return
 
         usage = total_pipeline_usage(pipeline_usage)
+        cost = compute_cost(usage, config.llm.model, config.llm.provider)
+        cost_str = f"${cost:.4f}" if isinstance(cost, float) else cost
         st.markdown(result.answer)
         citations = [_citation_to_dict(c) for c in result.citations]
         render_citations(citations)
-        st.caption(f"{usage.input_tokens} in / {usage.output_tokens} out tokens")
+        total = usage.input_tokens + usage.output_tokens
+        st.caption(
+            f"Cost: {cost_str}  ·  {total:,} tokens"
+            f"  ({usage.input_tokens:,} prompt / {usage.output_tokens:,} completion)"
+        )
 
         st.session_state.messages.append({
             "role": "assistant",
@@ -158,6 +165,7 @@ def submit_query(query: str, graph, feedback_repo: FeedbackRepo) -> None:
             "usage": {
                 "input_tokens": usage.input_tokens,
                 "output_tokens": usage.output_tokens,
+                "cost_str": cost_str,
             },
         })
         msg_index = len(st.session_state.messages) - 1
@@ -209,7 +217,12 @@ def main() -> None:
                 render_citations(msg["citations"])
             if msg.get("usage"):
                 u = msg["usage"]
-                st.caption(f"{u['input_tokens']} in / {u['output_tokens']} out tokens")
+                total = u["input_tokens"] + u["output_tokens"]
+                cost_part = f"Cost: {u['cost_str']}  ·  " if u.get("cost_str") else ""
+                st.caption(
+                    f"{cost_part}{total:,} tokens"
+                    f"  ({u['input_tokens']:,} prompt / {u['output_tokens']:,} completion)"
+                )
             if msg["role"] == "assistant" and msg.get("query"):
                 render_feedback(i, msg["query"], msg["content"], feedback_repo)
 
@@ -221,11 +234,11 @@ def main() -> None:
             if cols[i % 2].button(q, key=f"sug_{i}", use_container_width=True):
                 clicked = q
         if clicked:
-            submit_query(clicked, graph, feedback_repo)
+            submit_query(clicked, graph, config, feedback_repo)
             st.rerun()
 
     if prompt := st.chat_input("Ask a question about SEC filings..."):
-        submit_query(prompt, graph, feedback_repo)
+        submit_query(prompt, graph, config, feedback_repo)
 
 
 if __name__ == "__main__":
