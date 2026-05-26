@@ -237,6 +237,7 @@ def main() -> None:
             submit_query(clicked, graph, config, feedback_repo)
             st.rerun()
 
+    st.caption(f"Generation model: {config.llm.model}")
     if prompt := st.chat_input("Ask a question about SEC filings..."):
         submit_query(prompt, graph, config, feedback_repo)
 
