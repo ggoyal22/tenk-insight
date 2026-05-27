@@ -51,6 +51,8 @@ def build_graph(
         return [Send("retrieve", {"task": t}) for t in tasks]
 
     def route_after_retrieve(state: GenerationState):
+        if state.get("has_error"):
+            return END
         if config.eval_stop_after == "retrieve":
             return END
         # Route to check_hop when enabled, within hop limit, and not triggered by reflection
@@ -64,6 +66,8 @@ def build_graph(
         return "generate"
 
     def route_after_check_hop(state: GenerationState):
+        if state.get("has_error"):
+            return END
         if config.eval_stop_after == "check_hop":
             return END
         tasks = state["pending_tasks"]
@@ -72,6 +76,8 @@ def build_graph(
         return "generate"
 
     def route_after_generate(state: GenerationState):
+        if state.get("has_error"):
+            return END
         if config.eval_stop_after == "generate":
             return END
         if config.reflection.enabled:

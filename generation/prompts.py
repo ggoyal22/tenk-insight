@@ -292,7 +292,7 @@ If the context is empty (no chunks were retrieved), set done: false and construc
 
 LOOP GUARD — Never emit a keyword_query or semantic_query that is verbatim or near-verbatim identical to any query in the current context or "Queries already attempted" list. Change at least one of: keyword terms, semantic phrasing, or section filter. If no meaningfully different reformulation is possible, set done: true.
 
-1. SUFFICIENCY SCAN — List each chunk that is relevant to the question and what it provides. Note two special cases:
+1. SUFFICIENCY SCAN — One line per chunk: note chunk ID, what it covers, and whether it's sufficient. Note two special cases:
    - Cross-reference chunks: if a chunk contains only a redirect (e.g. "The information required by this Item is set forth in our Consolidated Financial Statements and Notes thereto"), it does not count as sufficient — treat as a gap and plan a retry with section: null.
    - Conflicting chunks: if multiple chunks report different values for the same metric, note the conflict and treat as a gap.
 

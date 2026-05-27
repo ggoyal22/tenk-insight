@@ -1,7 +1,7 @@
 import operator
 from dataclasses import dataclass
 from datetime import date
-from typing import Annotated, Literal, TypedDict
+from typing import Annotated, Literal, NotRequired, TypedDict
 
 from pydantic import BaseModel, Field
 
@@ -17,6 +17,13 @@ _MAX_HYDE_QUERY     = 800
 # ── Pydantic models — produced by the LLM via chat_structured() ──────────────
 # These must be BaseModel so chat_structured() can derive a JSON Schema from
 # them and parse the LLM's response back into typed objects.
+
+class RetrievalTaskNoHyde(BaseModel):
+    """RetrievalTask without hyde_query — used in hop/reflect decisions where HyDE expansion hasn't run yet."""
+    keyword_query: str = Field(max_length=_MAX_KEYWORD_QUERY)
+    semantic_query: str = Field(max_length=_MAX_SEMANTIC_QUERY)
+    filter: MetadataFilter | None = None
+
 
 class RetrievalTask(BaseModel):
     """A single retrieval request: a search query plus optional metadata filters."""
@@ -37,14 +44,14 @@ class QueryPlan(BaseModel):
             "Copy verbatim if already self-contained."
         )
     )
-    tasks: list[RetrievalTask]
+    tasks: list[RetrievalTaskNoHyde]
 
 
 class HopDecision(BaseModel):
     """Structured output of the check_hop node."""
     reasoning: str = Field(description="Scan context for sufficiency, identify gaps, and plan next query before deciding.")
     done: bool
-    next_task: RetrievalTask | None = None
+    next_task: RetrievalTaskNoHyde | None = None
 
 
 class ReflectionDecision(BaseModel):
@@ -52,7 +59,7 @@ class ReflectionDecision(BaseModel):
     reasoning: str = Field(description="Check relevance then verify each factual claim against the context before deciding quality.")
     quality: Literal["high", "low"]
     reason: str | None = None
-    next_task: RetrievalTask | None = None
+    next_task: RetrievalTaskNoHyde | None = None
 
 
 class GenerationResponse(BaseModel):
@@ -110,3 +117,4 @@ class GenerationState(TypedDict):
     reflection_count: int
     retrieval_triggered_by: Literal["analysis", "check_hop", "reflect"]
     answer: GenerationResult | None
+    has_error: NotRequired[bool]

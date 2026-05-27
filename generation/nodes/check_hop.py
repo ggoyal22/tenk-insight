@@ -4,11 +4,11 @@ from collections.abc import Callable
 from generation.nodes._stream import get_writer
 
 from config.loader import GenerationConfig
-from llm.base import BaseLLM
+from llm.base import BaseLLM, LLMError
 from llm.types import Message
 from generation.nodes._context import build_hop_context
 from generation.token_limits import MAX_TOKENS_CHECK_HOP
-from generation.types import GenerationState, HopDecision
+from generation.types import GenerationResult, GenerationState, HopDecision, RetrievalTask
 
 logger = logging.getLogger(__name__)
 
@@ -43,11 +43,21 @@ def make_check_hop(llm: BaseLLM, config: GenerationConfig, prompt: str) -> Calla
             content=messages[-1].content + failed_section,
         )
 
-        response = llm.chat_structured(messages, HopDecision, max_tokens=MAX_TOKENS_CHECK_HOP)
+        try:
+            response = llm.chat_structured(messages, HopDecision, max_tokens=MAX_TOKENS_CHECK_HOP)
+        except LLMError:
+            logger.exception("check_hop failed — stopping retrieval early.")
+            return {
+                "pending_tasks": [],
+                "hop_count": state["hop_count"] + 1,
+                "pipeline_usage": [],
+                "has_error": True,
+                "answer": GenerationResult(answer="Something went wrong — please try again.", citations=[]),
+            }
         decision = response.parsed
 
         pending_tasks = (
-            [decision.next_task]
+            [RetrievalTask.model_validate(decision.next_task.model_dump())]
             if not decision.done and decision.next_task
             else []
         )

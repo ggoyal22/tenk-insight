@@ -6,7 +6,7 @@ from generation.nodes._stream import get_writer
 
 from etl.embedder.base import Embedder
 from retrieval.retriever import Retriever
-from generation.types import RetrievalTask
+from generation.types import GenerationResult, RetrievalTask
 
 logger = logging.getLogger(__name__)
 
@@ -37,15 +37,22 @@ def make_retrieve(retriever: Retriever, embedder: Embedder) -> Callable[[Retriev
         # Embedding errors (model failure, OOM) are intentionally not caught here —
         # they propagate up and surface as a clear graph-level failure rather than
         # silently degrading to keyword-only retrieval.
-        query_to_embed = hyde_query if hyde_query else task.semantic_query
-        semantic_embedding = embedder.embed([query_to_embed])[0]
-
-        results = retriever.retrieve(
-            keyword_query=task.keyword_query,
-            semantic_embedding=semantic_embedding,
-            rerank_query=task.semantic_query,
-            filters=task.filter,
-        )
+        try:
+            query_to_embed = hyde_query if hyde_query else task.semantic_query
+            semantic_embedding = embedder.embed([query_to_embed])[0]
+            results = retriever.retrieve(
+                keyword_query=task.keyword_query,
+                semantic_embedding=semantic_embedding,
+                rerank_query=task.semantic_query,
+                filters=task.filter,
+            )
+        except Exception:
+            logger.exception("retrieve failed for query %r.", task.keyword_query)
+            return {
+                "completed_results": [[]],
+                "has_error": True,
+                "answer": GenerationResult(answer="Something went wrong — please try again.", citations=[]),
+            }
 
         logger.debug(
             "Retrieved %d result(s) for keyword_query %r (filter=%s).",

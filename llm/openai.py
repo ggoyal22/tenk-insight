@@ -2,6 +2,7 @@ import logging
 from typing import TypeVar
 
 from openai import OpenAI, OpenAIError
+from openai import LengthFinishReasonError
 from pydantic import BaseModel
 
 from config.loader import LLMConfig
@@ -61,6 +62,13 @@ class OpenAILLM(BaseLLM):
                 response_format=schema,
                 **params,
             )
+        except LengthFinishReasonError as e:
+            truncated = e.completion.choices[0].message.content or ""
+            logger.warning(
+                "chat_structured hit token limit (schema=%s). Truncated content (%d chars):\n%s",
+                schema.__name__, len(truncated), truncated,
+            )
+            raise LLMError(str(e), _PROVIDER, self._model) from e
         except OpenAIError as e:
             raise LLMError(str(e), _PROVIDER, self._model) from e
 

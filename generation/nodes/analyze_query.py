@@ -3,9 +3,9 @@ from collections.abc import Callable
 
 from db.repositories.filings import FilingsRepo
 from generation.nodes._stream import get_writer
-from generation.types import GenerationResult, GenerationState, QueryPlan
+from generation.types import GenerationResult, GenerationState, QueryPlan, RetrievalTask
 from generation.token_limits import MAX_TOKENS_ANALYZE
-from llm.base import BaseLLM
+from llm.base import BaseLLM, LLMError
 from llm.types import Message
 
 logger = logging.getLogger(__name__)
@@ -24,7 +24,20 @@ def make_analyze_query(
             Message(role="system", content=prompt),
             Message(role="user", content=_build_user_message(state)),
         ]
-        response = llm.chat_structured(messages, QueryPlan, max_tokens=MAX_TOKENS_ANALYZE)
+        try:
+            response = llm.chat_structured(messages, QueryPlan, max_tokens=MAX_TOKENS_ANALYZE)
+        except LLMError:
+            logger.exception("analyze_query failed.")
+            return {
+                "query_type": "single",
+                "resolved_query": state["query"],
+                "retrieval_triggered_by": "analysis",
+                "pipeline_usage": [],
+                "answer": GenerationResult(
+                    answer="Something went wrong — please try again.",
+                    citations=[],
+                ),
+            }
         plan = response.parsed
 
         logger.debug(
@@ -77,7 +90,7 @@ def make_analyze_query(
 
         n = len(tasks)
         write(f"{n} search task{'s' if n != 1 else ''} planned")
-        return {**base, "pending_tasks": tasks}
+        return {**base, "pending_tasks": [RetrievalTask.model_validate(t.model_dump()) for t in tasks]}
 
     return analyze_query
 

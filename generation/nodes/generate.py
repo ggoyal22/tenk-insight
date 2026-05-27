@@ -4,7 +4,7 @@ from uuid import UUID
 
 from generation.nodes._stream import get_writer
 
-from llm.base import BaseLLM
+from llm.base import BaseLLM, LLMError
 from llm.types import Message
 from generation.nodes._context import build_context
 from generation.token_limits import MAX_TOKENS_GENERATE
@@ -37,7 +37,15 @@ def make_generate(
             Message(role="user", content=f"Question: {state.get('resolved_query') or state['query']}\n\nContext:\n{context}"),
         ]
 
-        response = llm.chat_structured(messages, GenerationResponse, max_tokens=MAX_TOKENS_GENERATE)
+        try:
+            response = llm.chat_structured(messages, GenerationResponse, max_tokens=MAX_TOKENS_GENERATE)
+        except LLMError:
+            logger.exception("generate failed.")
+            return {
+                "has_error": True,
+                "answer": GenerationResult(answer="Something went wrong — please try again.", citations=[]),
+            }
+
         cited_results = _filter_by_indices(results, response.parsed.cited_indices)
         citations = _build_citations(cited_results)
 

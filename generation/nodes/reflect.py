@@ -4,11 +4,11 @@ from collections.abc import Callable
 from generation.nodes._stream import get_writer
 
 from config.loader import GenerationConfig
-from llm.base import BaseLLM
+from llm.base import BaseLLM, LLMError
 from llm.types import Message
 from generation.nodes._context import build_context
 from generation.token_limits import MAX_TOKENS_REFLECT
-from generation.types import GenerationState, ReflectionDecision
+from generation.types import GenerationResult, GenerationState, ReflectionDecision, RetrievalTask
 
 logger = logging.getLogger(__name__)
 
@@ -29,11 +29,21 @@ def make_reflect(llm: BaseLLM, config: GenerationConfig, prompt: str) -> Callabl
                 ),
             ),
         ]
-        response = llm.chat_structured(messages, ReflectionDecision, max_tokens=MAX_TOKENS_REFLECT)
+        try:
+            response = llm.chat_structured(messages, ReflectionDecision, max_tokens=MAX_TOKENS_REFLECT)
+        except LLMError:
+            logger.exception("reflect failed — accepting current answer.")
+            return {
+                "pending_tasks": [],
+                "reflection_count": state["reflection_count"] + 1,
+                "pipeline_usage": [],
+                "has_error": True,
+                "answer": GenerationResult(answer="Something went wrong — please try again.", citations=[]),
+            }
         decision = response.parsed
 
         pending_tasks = (
-            [decision.next_task]
+            [RetrievalTask.model_validate(decision.next_task.model_dump())]
             if decision.quality == "low" and decision.next_task
             else []
         )
