@@ -16,7 +16,7 @@ from config.loader import GenerationConfig
 from generation.factory import make_initial_state
 from generation.graph import build_graph
 from generation.nodes import (
-    make_analyze_query, make_check_hop, make_generate,
+    make_analyze_query, make_check_hop, make_embed_queries, make_generate,
     make_hyde_expand, make_reflect, make_retrieve,
 )
 from generation.types import (
@@ -91,6 +91,7 @@ def _build_graph(llm, retriever, embedder, config: GenerationConfig, filings_rep
     return build_graph(
         analyze_query_fn=make_analyze_query(llm, "Analyze the query.", filings_repo or _make_filings_repo()),
         hyde_expand_fn=make_hyde_expand(llm, "Write a hypothetical passage."),
+        embed_queries_fn=make_embed_queries(embedder),
         retrieve_fn=make_retrieve(retriever, embedder),
         generate_fn=make_generate(llm, "Answer the question.", "Compare the companies."),
         check_hop_fn=make_check_hop(llm, config, "Decide if more retrieval is needed."),

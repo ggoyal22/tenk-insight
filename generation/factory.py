@@ -6,6 +6,7 @@ from generation.graph import build_graph
 from generation.nodes import (
     make_analyze_query,
     make_check_hop,
+    make_embed_queries,
     make_generate,
     make_hyde_expand,
     make_reflect,
@@ -39,6 +40,7 @@ def build_generation_pipeline(config: AppConfig, db_client: DatabaseClient, embe
     return build_graph(
         analyze_query_fn=make_analyze_query(llm, prompts.analyze, filings_repo),
         hyde_expand_fn=make_hyde_expand(llm, prompts.hyde),
+        embed_queries_fn=make_embed_queries(embedder),
         retrieve_fn=make_retrieve(retriever, embedder),
         generate_fn=make_generate(llm, prompts.qa, prompts.comparison),
         check_hop_fn=make_check_hop(llm, config.generation, prompts.check_hop),

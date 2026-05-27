@@ -31,15 +31,12 @@ def make_retrieve(retriever: Retriever, embedder: Embedder) -> Callable[[Retriev
         else:
             write(f"Searching: {query_snippet}...")
 
-        # Embed hyde_query for vector search when available — the hypothetical passage
-        # is closer in embedding space to relevant chunks than the raw question.
+        # Use the pre-computed embedding from embed_queries when available (batch path).
+        # Falls back to single-query embedding for check_hop/reflect-triggered retrieves.
         # Keyword search always uses the raw query (handled inside Retriever).
-        # Embedding errors (model failure, OOM) are intentionally not caught here —
-        # they propagate up and surface as a clear graph-level failure rather than
-        # silently degrading to keyword-only retrieval.
         try:
             query_to_embed = hyde_query if hyde_query else task.semantic_query
-            semantic_embedding = embedder.embed([query_to_embed])[0]
+            semantic_embedding = task.query_embedding if task.query_embedding is not None else embedder.embed([query_to_embed])[0]
             results = retriever.retrieve(
                 keyword_query=task.keyword_query,
                 semantic_embedding=semantic_embedding,
@@ -62,7 +59,7 @@ def make_retrieve(retriever: Retriever, embedder: Embedder) -> Callable[[Retriev
         if not results:
             return {
                 "completed_results": [results],
-                "failed_queries": [task.model_copy(update={"hyde_query": None})],
+                "failed_queries": [task.model_copy(update={"hyde_query": None, "query_embedding": None})],
             }
 
         for r in results:

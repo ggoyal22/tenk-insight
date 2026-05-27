@@ -31,6 +31,8 @@ class RetrievalTask(BaseModel):
     semantic_query: str = Field(max_length=_MAX_SEMANTIC_QUERY)
     filter: MetadataFilter | None = None
     hyde_query: str | None = Field(default=None, max_length=_MAX_HYDE_QUERY)
+    # Pre-computed by embed_queries node; excluded from serialisation (large + internal).
+    query_embedding: list[float] | None = Field(default=None, exclude=True)
 
 
 class QueryPlan(BaseModel):

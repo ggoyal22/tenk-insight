@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 def build_graph(
     analyze_query_fn: Callable,
     hyde_expand_fn: Callable,
+    embed_queries_fn: Callable,
     retrieve_fn: Callable,
     generate_fn: Callable,
     check_hop_fn: Callable,
@@ -39,7 +40,7 @@ def build_graph(
             return END
         if config.hyde.enabled:
             return "hyde_expand"
-        return [Send("retrieve", {"task": t}) for t in state["pending_tasks"]]
+        return "embed_queries"
 
     def route_after_hyde(state: GenerationState):
         if config.eval_stop_after == "hyde_expand":
@@ -47,6 +48,13 @@ def build_graph(
         tasks = state["pending_tasks"]
         if not tasks:
             logger.warning("No retrieval tasks after HyDE expansion — terminating without answer.")
+            return END
+        return "embed_queries"
+
+    def route_after_embed(state: GenerationState):
+        tasks = state["pending_tasks"]
+        if not tasks:
+            logger.warning("No retrieval tasks after embedding — terminating without answer.")
             return END
         return [Send("retrieve", {"task": t}) for t in tasks]
 
@@ -98,6 +106,7 @@ def build_graph(
 
     g.add_node("analyze_query", analyze_query_fn)
     g.add_node("hyde_expand", hyde_expand_fn)
+    g.add_node("embed_queries", embed_queries_fn)
     g.add_node("retrieve", retrieve_fn)
     g.add_node("generate", generate_fn)
     g.add_node("check_hop", check_hop_fn)
@@ -106,6 +115,7 @@ def build_graph(
     g.set_entry_point("analyze_query")
     g.add_conditional_edges("analyze_query", route_after_analyze)
     g.add_conditional_edges("hyde_expand", route_after_hyde)
+    g.add_conditional_edges("embed_queries", route_after_embed)
     g.add_conditional_edges("retrieve", route_after_retrieve)
     g.add_conditional_edges("check_hop", route_after_check_hop)
     g.add_conditional_edges("generate", route_after_generate)

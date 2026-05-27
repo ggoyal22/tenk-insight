@@ -18,6 +18,7 @@ from generation.types import (
     QueryPlan,
     ReflectionDecision,
     RetrievalTask,
+    RetrievalTaskNoHyde,
 )
 from llm.types import LLMUsage
 from retrieval.types import MetadataFilter
@@ -60,7 +61,7 @@ def test_retrieval_task_has_json_schema():
 # ---------------------------------------------------------------------------
 
 def test_query_plan_single():
-    task = RetrievalTask(keyword_query="NVDA revenue 2024", semantic_query="What was NVIDIA's revenue in FY2024?")
+    task = RetrievalTaskNoHyde(keyword_query="NVDA revenue 2024", semantic_query="What was NVIDIA's revenue in FY2024?")
     plan = QueryPlan(
         reasoning="Single company metric lookup.",
         query_type="single",
@@ -77,8 +78,8 @@ def test_query_plan_comparison():
         query_type="comparison",
         resolved_query="Compare NVDA and AMD revenue.",
         tasks=[
-            RetrievalTask(keyword_query="revenue net sales", semantic_query="What was NVIDIA's revenue?", filter=MetadataFilter(ticker="NVDA")),
-            RetrievalTask(keyword_query="revenue net sales", semantic_query="What was AMD's revenue?", filter=MetadataFilter(ticker="AMD")),
+            RetrievalTaskNoHyde(keyword_query="revenue net sales", semantic_query="What was NVIDIA's revenue?", filter=MetadataFilter(ticker="NVDA")),
+            RetrievalTaskNoHyde(keyword_query="revenue net sales", semantic_query="What was AMD's revenue?", filter=MetadataFilter(ticker="AMD")),
         ],
     )
     assert plan.query_type == "comparison"
@@ -136,7 +137,7 @@ def test_hop_decision_done():
 
 
 def test_hop_decision_not_done_with_task():
-    task = RetrievalTask(keyword_query="follow-up query", semantic_query="What is the follow-up information?")
+    task = RetrievalTaskNoHyde(keyword_query="follow-up query", semantic_query="What is the follow-up information?")
     hd = HopDecision(done=False, next_task=task)
     assert hd.done is False
     assert hd.next_task.keyword_query == "follow-up query"
@@ -158,7 +159,7 @@ def test_reflection_decision_high_quality():
 
 
 def test_reflection_decision_low_quality_with_task():
-    task = RetrievalTask(keyword_query="missing revenue data", semantic_query="What is the missing revenue figure?")
+    task = RetrievalTaskNoHyde(keyword_query="missing revenue data", semantic_query="What is the missing revenue figure?")
     rd = ReflectionDecision(quality="low", reason="revenue figure not in context", next_task=task)
     assert rd.quality == "low"
     assert rd.next_task.keyword_query == "missing revenue data"
