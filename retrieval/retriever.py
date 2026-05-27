@@ -2,6 +2,7 @@ import logging
 from uuid import UUID
 
 from config.loader import RetrievalConfig
+from db.models import ChunkRecord
 from db.repositories.chunks import ChunksRepo
 from db.repositories.filings import FilingsRepo
 from db.repositories.parent_chunks import ParentChunksRepo
@@ -81,14 +82,15 @@ class Retriever:
         fused = self._fusion.fuse(*ranked_lists)
         fused = fused[: self._config.fusion.top_k]
 
+        chunks = self._chunks.get_by_ids_no_embedding([cid for cid, _ in fused])
+
         reranking_active = bool(self._reranker and self._config.reranking.enabled)
         reranked: list[tuple[UUID, float]] | None = None
 
         if reranking_active:
-            chunks = self._chunks.get_by_ids_no_embedding([cid for cid, _ in fused])
             reranked = self._reranker.rerank(rerank_query or keyword_query, chunks)
 
-        results = self._enrich(fused, vector_scores, keyword_scores, reranked=reranked)
+        results = self._enrich(fused, vector_scores, keyword_scores, chunks, reranked=reranked)
         top_k = self._config.reranking.top_k if reranking_active else self._config.final_top_k
         return results[:top_k]
 
@@ -119,10 +121,12 @@ class Retriever:
         fused: list[tuple[UUID, float]],
         vector_scores: dict[UUID, float],
         keyword_scores: dict[UUID, float],
+        chunks: list[ChunkRecord],
         reranked: list[tuple[UUID, float]] | None = None,
     ) -> list[RetrievalResult]:
-        """Batch-fetch chunks, parent chunks, and filings; assemble RetrievalResult objects.
+        """Assemble RetrievalResult objects from pre-fetched chunks, parent chunks, and filings.
 
+        chunks are fetched once in retrieve() and passed in to avoid a duplicate DB call.
         When reranked is provided, iteration follows reranker order so parent dedup
         keeps the highest-reranker-scored child per parent. RRF scores from fused
         are preserved in RetrievalResult.score.
@@ -134,7 +138,6 @@ class Retriever:
         rrf_score_map = {cid: score for cid, score in fused}
         reranker_score_map = {cid: score for cid, score in reranked} if reranked else {}
 
-        chunks = self._chunks.get_by_ids_no_embedding(chunk_ids)
         chunk_map = {c.id: c for c in chunks}
 
         parent_ids = [c.parent_chunk_id for c in chunks]
