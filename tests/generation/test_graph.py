@@ -21,7 +21,7 @@ from generation.nodes import (
 )
 from generation.types import (
     GenerationResponse, GenerationResult, HopDecision, QueryPlan,
-    ReflectionDecision, RetrievalTask,
+    ReflectionDecision, RetrievalTask, RetrievalTaskNoHyde,
 )
 from llm.types import LLMResponse, LLMUsage, StructuredResponse
 from retrieval.types import MetadataFilter, RetrievalResult
@@ -65,7 +65,7 @@ def _make_retrieval_result(ticker: str = "NVDA") -> RetrievalResult:
 
 def _make_embedder(dim: int = 1024) -> MagicMock:
     embedder = MagicMock()
-    embedder.embed.return_value = [[0.1] * dim]
+    embedder.embed.side_effect = lambda queries: [[0.1] * dim for _ in queries]
     return embedder
 
 
@@ -110,7 +110,7 @@ def _make_query_plan(query_type="single", resolved_query="What was NVDA's revenu
         reasoning="Test reasoning.",
         query_type=query_type,
         resolved_query=resolved_query,
-        tasks=tasks if tasks is not None else [RetrievalTask(keyword_query="NVDA revenue 2024", semantic_query="What was NVIDIA's revenue in FY2024?")],
+        tasks=tasks if tasks is not None else [RetrievalTaskNoHyde(keyword_query="NVDA revenue 2024", semantic_query="What was NVIDIA's revenue in FY2024?")],
     )
 
 
@@ -131,7 +131,7 @@ def test_single_query_produces_answer():
             return StructuredResponse(parsed=_make_query_plan(), usage=_usage())
         if schema == GenerationResponse:
             return StructuredResponse(
-                parsed=GenerationResponse(answer="Revenue was $60.9B.", cited_indices=[1]),
+                parsed=GenerationResponse(reasoning="Test reasoning.", answer="Revenue was $60.9B.", cited_indices=[1]),
                 usage=_usage(),
             )
         raise ValueError(f"Unexpected schema: {schema}")
@@ -166,7 +166,7 @@ def test_resolved_query_stored_in_state():
             )
         if schema == GenerationResponse:
             return StructuredResponse(
-                parsed=GenerationResponse(answer="Revenue was $60.9B.", cited_indices=[1]),
+                parsed=GenerationResponse(reasoning="Test reasoning.", answer="Revenue was $60.9B.", cited_indices=[1]),
                 usage=_usage(),
             )
         raise ValueError(f"Unexpected schema: {schema}")
@@ -279,7 +279,7 @@ def test_all_tickers_missing_returns_canned_answer():
             reasoning="Single company lookup.",
             query_type="single",
             resolved_query="What was FAKE's revenue?",
-            tasks=[RetrievalTask(keyword_query="FAKE revenue", semantic_query="What was FAKE's revenue?", filter=MetadataFilter(ticker="FAKE"))],
+            tasks=[RetrievalTaskNoHyde(keyword_query="FAKE revenue", semantic_query="What was FAKE's revenue?", filter=MetadataFilter(ticker="FAKE"))],
         ),
         usage=_usage(),
     )
@@ -313,7 +313,7 @@ def test_hyde_passage_is_used_for_embedding():
             return StructuredResponse(parsed=_make_query_plan(), usage=_usage())
         if schema == GenerationResponse:
             return StructuredResponse(
-                parsed=GenerationResponse(answer="Revenue was $60.9B.", cited_indices=[1]),
+                parsed=GenerationResponse(reasoning="Test reasoning.", answer="Revenue was $60.9B.", cited_indices=[1]),
                 usage=_usage(),
             )
         raise ValueError(f"Unexpected schema: {schema}")
@@ -347,12 +347,12 @@ def test_reflection_high_quality_ends_pipeline():
             return StructuredResponse(parsed=_make_query_plan(), usage=_usage())
         if schema == GenerationResponse:
             return StructuredResponse(
-                parsed=GenerationResponse(answer="Revenue was $60.9B.", cited_indices=[1]),
+                parsed=GenerationResponse(reasoning="Test reasoning.", answer="Revenue was $60.9B.", cited_indices=[1]),
                 usage=_usage(),
             )
         if schema == ReflectionDecision:
             return StructuredResponse(
-                parsed=ReflectionDecision(quality="high", reason="complete and grounded"),
+                parsed=ReflectionDecision(reasoning="All claims verified.", quality="high", reason="complete and grounded"),
                 usage=_usage(),
             )
         raise ValueError(f"Unexpected schema: {schema}")
@@ -384,7 +384,7 @@ def test_reflection_low_quality_triggers_extra_retrieval():
             return StructuredResponse(parsed=_make_query_plan(), usage=_usage())
         if schema == GenerationResponse:
             return StructuredResponse(
-                parsed=GenerationResponse(answer="Answer.", cited_indices=[1]),
+                parsed=GenerationResponse(reasoning="Test reasoning.", answer="Answer.", cited_indices=[1]),
                 usage=_usage(),
             )
         if schema == ReflectionDecision:
@@ -392,14 +392,15 @@ def test_reflection_low_quality_triggers_extra_retrieval():
             if reflection_calls["count"] == 1:
                 return StructuredResponse(
                     parsed=ReflectionDecision(
+                        reasoning="Gross margin not found in context.",
                         quality="low",
                         reason="missing gross margin",
-                        next_task=RetrievalTask(keyword_query="NVDA gross margin 2024", semantic_query="What was NVIDIA's gross margin in FY2024?"),
+                        next_task=RetrievalTaskNoHyde(keyword_query="NVDA gross margin 2024", semantic_query="What was NVIDIA's gross margin in FY2024?"),
                     ),
                     usage=_usage(),
                 )
             return StructuredResponse(
-                parsed=ReflectionDecision(quality="high", reason="now complete"),
+                parsed=ReflectionDecision(reasoning="All claims now verified.", quality="high", reason="now complete"),
                 usage=_usage(),
             )
         raise ValueError(f"Unexpected schema: {schema}")
@@ -433,15 +434,15 @@ def test_comparison_query_fans_out_to_parallel_retrieves():
                     query_type="comparison",
                     resolved_query="Compare NVDA and AMD revenue",
                     tasks=[
-                        RetrievalTask(keyword_query="revenue annual", semantic_query="What was NVIDIA's annual revenue?", filter=MetadataFilter(ticker="NVDA")),
-                        RetrievalTask(keyword_query="revenue annual", semantic_query="What was AMD's annual revenue?", filter=MetadataFilter(ticker="AMD")),
+                        RetrievalTaskNoHyde(keyword_query="revenue annual", semantic_query="What was NVIDIA's annual revenue?", filter=MetadataFilter(ticker="NVDA")),
+                        RetrievalTaskNoHyde(keyword_query="revenue annual", semantic_query="What was AMD's annual revenue?", filter=MetadataFilter(ticker="AMD")),
                     ],
                 ),
                 usage=_usage(),
             )
         if schema == GenerationResponse:
             return StructuredResponse(
-                parsed=GenerationResponse(answer="NVDA > AMD.", cited_indices=[1, 2]),
+                parsed=GenerationResponse(reasoning="Test reasoning.", answer="NVDA > AMD.", cited_indices=[1, 2]),
                 usage=_usage(),
             )
         raise ValueError(f"Unexpected schema: {schema}")
@@ -485,15 +486,16 @@ def test_hop_enabled_triggers_extra_retrieval():
             if hop_calls["count"] == 1:
                 return StructuredResponse(
                     parsed=HopDecision(
+                        reasoning="Data center segment data needed.",
                         done=False,
-                        next_task=RetrievalTask(keyword_query="NVDA data center segment revenue", semantic_query="What was NVIDIA's data center segment revenue?"),
+                        next_task=RetrievalTaskNoHyde(keyword_query="NVDA data center segment revenue", semantic_query="What was NVIDIA's data center segment revenue?"),
                     ),
                     usage=_usage(),
                 )
-            return StructuredResponse(parsed=HopDecision(done=True), usage=_usage())
+            return StructuredResponse(parsed=HopDecision(reasoning="Context is sufficient.", done=True), usage=_usage())
         if schema == GenerationResponse:
             return StructuredResponse(
-                parsed=GenerationResponse(answer="Data center drove growth.", cited_indices=[1]),
+                parsed=GenerationResponse(reasoning="Test reasoning.", answer="Data center drove growth.", cited_indices=[1]),
                 usage=_usage(),
             )
         raise ValueError(f"Unexpected schema: {schema}")
@@ -524,7 +526,7 @@ def test_hop_disabled_skips_check_hop():
             return StructuredResponse(parsed=_make_query_plan(), usage=_usage())
         if schema == GenerationResponse:
             return StructuredResponse(
-                parsed=GenerationResponse(answer="Revenue was $60.9B.", cited_indices=[1]),
+                parsed=GenerationResponse(reasoning="Test reasoning.", answer="Revenue was $60.9B.", cited_indices=[1]),
                 usage=_usage(),
             )
         raise ValueError(f"Unexpected schema: {schema}")
@@ -560,15 +562,16 @@ def test_reflection_exhausted_terminates_after_max_iterations():
         if schema == GenerationResponse:
             generation_calls["count"] += 1
             return StructuredResponse(
-                parsed=GenerationResponse(answer="Partial answer.", cited_indices=[1]),
+                parsed=GenerationResponse(reasoning="Test reasoning.", answer="Partial answer.", cited_indices=[1]),
                 usage=_usage(),
             )
         if schema == ReflectionDecision:
             return StructuredResponse(
                 parsed=ReflectionDecision(
+                    reasoning="Answer is still incomplete.",
                     quality="low",
                     reason="still incomplete",
-                    next_task=RetrievalTask(keyword_query="more data", semantic_query="What is the additional data needed?"),
+                    next_task=RetrievalTaskNoHyde(keyword_query="more data", semantic_query="What is the additional data needed?"),
                 ),
                 usage=_usage(),
             )

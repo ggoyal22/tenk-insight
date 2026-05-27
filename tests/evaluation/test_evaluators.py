@@ -31,7 +31,10 @@ def _sample(reference: str | None = None) -> EvalSample:
 
 def test_all_expected_metrics_in_registry():
     assert set(_METRIC_REGISTRY.keys()) == {
-        "faithfulness", "answer_relevancy", "context_precision", "context_recall"
+        "faithfulness", "answer_relevancy", "context_precision", "context_recall",
+        "answer_correctness", "factual_correctness", "semantic_similarity",
+        "context_relevance", "context_entity_recall", "noise_sensitivity",
+        "context_utilization", "response_groundedness",
     }
 
 

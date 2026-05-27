@@ -17,7 +17,7 @@ from generation.nodes.reflect import make_reflect
 from generation.nodes.retrieve import make_retrieve, RetrieveInput
 from generation.types import (
     Citation, GenerationResponse, GenerationResult, GenerationState,
-    HopDecision, QueryPlan, ReflectionDecision, RetrievalTask,
+    HopDecision, QueryPlan, ReflectionDecision, RetrievalTask, RetrievalTaskNoHyde,
 )
 from llm.base import LLMError
 from llm.types import LLMResponse, LLMUsage, Message, StructuredResponse
@@ -137,7 +137,7 @@ def _make_query_plan(query_type="single", tasks=None) -> QueryPlan:
         reasoning="Test reasoning.",
         query_type=query_type,
         resolved_query="What was NVDA's revenue in 2024?",
-        tasks=tasks if tasks is not None else [RetrievalTask(keyword_query="NVDA revenue 2024", semantic_query="What was NVIDIA's revenue in FY2024?")],
+        tasks=tasks if tasks is not None else [RetrievalTaskNoHyde(keyword_query="NVDA revenue 2024", semantic_query="What was NVIDIA's revenue in FY2024?")],
     )
 
 
@@ -229,7 +229,7 @@ def test_analyze_query_all_tickers_missing_returns_canned_answer():
         reasoning="Single company lookup.",
         query_type="single",
         resolved_query="What was FAKE's revenue?",
-        tasks=[RetrievalTask(keyword_query="FAKE revenue", semantic_query="What was FAKE's revenue?", filter=MetadataFilter(ticker="FAKE"))],
+        tasks=[RetrievalTaskNoHyde(keyword_query="FAKE revenue", semantic_query="What was FAKE's revenue?", filter=MetadataFilter(ticker="FAKE"))],
     )
     llm = _make_llm(structured_return=StructuredResponse(parsed=plan, usage=_make_usage()))
 
@@ -248,8 +248,8 @@ def test_analyze_query_partial_ticker_missing_returns_canned_answer():
         query_type="comparison",
         resolved_query="Compare NVDA and AMD revenue.",
         tasks=[
-            RetrievalTask(keyword_query="revenue net sales", semantic_query="What was NVIDIA's revenue?", filter=MetadataFilter(ticker="NVDA")),
-            RetrievalTask(keyword_query="revenue net sales", semantic_query="What was AMD's revenue?", filter=MetadataFilter(ticker="AMD")),
+            RetrievalTaskNoHyde(keyword_query="revenue net sales", semantic_query="What was NVIDIA's revenue?", filter=MetadataFilter(ticker="NVDA")),
+            RetrievalTaskNoHyde(keyword_query="revenue net sales", semantic_query="What was AMD's revenue?", filter=MetadataFilter(ticker="AMD")),
         ],
     )
     llm = _make_llm(structured_return=StructuredResponse(parsed=plan, usage=_make_usage()))
@@ -265,7 +265,7 @@ def test_analyze_query_partial_ticker_missing_returns_canned_answer():
 
 
 def test_analyze_query_returns_pending_tasks_on_success():
-    task = RetrievalTask(keyword_query="NVDA revenue 2024", semantic_query="What was NVIDIA's revenue in FY2024?", filter=MetadataFilter(ticker="NVDA"))
+    task = RetrievalTaskNoHyde(keyword_query="NVDA revenue 2024", semantic_query="What was NVIDIA's revenue in FY2024?", filter=MetadataFilter(ticker="NVDA"))
     plan = _make_query_plan(tasks=[task])
     llm = _make_llm(structured_return=StructuredResponse(parsed=plan, usage=_make_usage()))
 
@@ -404,7 +404,7 @@ def test_retrieve_passes_filter_to_retriever():
 # ---------------------------------------------------------------------------
 
 def _make_gen_response(answer: str, cited_indices: list[int]) -> StructuredResponse:
-    return StructuredResponse(parsed=GenerationResponse(answer=answer, cited_indices=cited_indices), usage=_make_usage())
+    return StructuredResponse(parsed=GenerationResponse(reasoning="Test reasoning.", answer=answer, cited_indices=cited_indices), usage=_make_usage())
 
 
 def test_generate_returns_generation_result():
@@ -553,7 +553,7 @@ def test_generate_selects_correct_prompt(query_type, expected_keyword):
 # ---------------------------------------------------------------------------
 
 def test_check_hop_returns_empty_tasks_when_done():
-    decision = HopDecision(done=True)
+    decision = HopDecision(reasoning="Context is sufficient.", done=True)
     llm = _make_llm(structured_return=StructuredResponse(parsed=decision, usage=_make_usage()))
     result = _make_retrieval_result()
 
@@ -566,8 +566,8 @@ def test_check_hop_returns_empty_tasks_when_done():
 
 
 def test_check_hop_returns_next_task_when_not_done():
-    next_task = RetrievalTask(keyword_query="follow-up query", semantic_query="What is the follow-up information?")
-    decision = HopDecision(done=False, next_task=next_task)
+    next_task = RetrievalTaskNoHyde(keyword_query="follow-up query", semantic_query="What is the follow-up information?")
+    decision = HopDecision(reasoning="Gap identified.", done=False, next_task=next_task)
     llm = _make_llm(structured_return=StructuredResponse(parsed=decision, usage=_make_usage()))
     result = _make_retrieval_result()
 
@@ -579,7 +579,7 @@ def test_check_hop_returns_next_task_when_not_done():
 
 
 def test_check_hop_returns_empty_tasks_when_not_done_but_next_task_is_none():
-    decision = HopDecision(done=False, next_task=None)
+    decision = HopDecision(reasoning="Gap identified but no task.", done=False, next_task=None)
     llm = _make_llm(structured_return=StructuredResponse(parsed=decision, usage=_make_usage()))
     result = _make_retrieval_result()
 
@@ -594,7 +594,7 @@ def test_check_hop_returns_empty_tasks_when_not_done_but_next_task_is_none():
 # ---------------------------------------------------------------------------
 
 def test_reflect_returns_empty_tasks_on_high_quality():
-    decision = ReflectionDecision(quality="high", reason="complete and grounded")
+    decision = ReflectionDecision(reasoning="All claims verified.", quality="high", reason="complete and grounded")
     llm = _make_llm(structured_return=StructuredResponse(parsed=decision, usage=_make_usage()))
     result = _make_retrieval_result()
     answer = GenerationResult(answer="Revenue was $60.9B.", citations=[])
@@ -608,8 +608,8 @@ def test_reflect_returns_empty_tasks_on_high_quality():
 
 
 def test_reflect_returns_next_task_on_low_quality():
-    next_task = RetrievalTask(keyword_query="missing data", semantic_query="What is the missing data?")
-    decision = ReflectionDecision(quality="low", reason="revenue figure missing", next_task=next_task)
+    next_task = RetrievalTaskNoHyde(keyword_query="missing data", semantic_query="What is the missing data?")
+    decision = ReflectionDecision(reasoning="Revenue figure not found.", quality="low", reason="revenue figure missing", next_task=next_task)
     llm = _make_llm(structured_return=StructuredResponse(parsed=decision, usage=_make_usage()))
     result = _make_retrieval_result()
     answer = GenerationResult(answer="Incomplete answer.", citations=[])
@@ -622,7 +622,7 @@ def test_reflect_returns_next_task_on_low_quality():
 
 
 def test_reflect_returns_empty_tasks_when_low_quality_but_no_next_task():
-    decision = ReflectionDecision(quality="low", reason="out of scope", next_task=None)
+    decision = ReflectionDecision(reasoning="Answer is out of scope.", quality="low", reason="out of scope", next_task=None)
     llm = _make_llm(structured_return=StructuredResponse(parsed=decision, usage=_make_usage()))
     result = _make_retrieval_result()
     answer = GenerationResult(answer="Bad answer.", citations=[])

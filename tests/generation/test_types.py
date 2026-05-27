@@ -131,14 +131,14 @@ def test_query_plan_resolved_query_has_description_in_schema():
 # ---------------------------------------------------------------------------
 
 def test_hop_decision_done():
-    hd = HopDecision(done=True)
+    hd = HopDecision(reasoning="No gaps found.", done=True)
     assert hd.done is True
     assert hd.next_task is None
 
 
 def test_hop_decision_not_done_with_task():
     task = RetrievalTaskNoHyde(keyword_query="follow-up query", semantic_query="What is the follow-up information?")
-    hd = HopDecision(done=False, next_task=task)
+    hd = HopDecision(reasoning="Follow-up needed.", done=False, next_task=task)
     assert hd.done is False
     assert hd.next_task.keyword_query == "follow-up query"
 
@@ -153,14 +153,14 @@ def test_hop_decision_has_json_schema():
 # ---------------------------------------------------------------------------
 
 def test_reflection_decision_high_quality():
-    rd = ReflectionDecision(quality="high", reason="answer is complete and grounded")
+    rd = ReflectionDecision(reasoning="Claims verified.", quality="high", reason="answer is complete and grounded")
     assert rd.quality == "high"
     assert rd.next_task is None
 
 
 def test_reflection_decision_low_quality_with_task():
     task = RetrievalTaskNoHyde(keyword_query="missing revenue data", semantic_query="What is the missing revenue figure?")
-    rd = ReflectionDecision(quality="low", reason="revenue figure not in context", next_task=task)
+    rd = ReflectionDecision(reasoning="Revenue data missing.", quality="low", reason="revenue figure not in context", next_task=task)
     assert rd.quality == "low"
     assert rd.next_task.keyword_query == "missing revenue data"
 
