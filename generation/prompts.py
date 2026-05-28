@@ -76,13 +76,7 @@ Return only valid JSON. All reasoning must appear inside the `reasoning` field �
 Analyse the incoming query and produce a structured retrieval plan.
 
 First, fill the `reasoning` field to think through each step in order:
-1. SCOPE CHECK — Can this question be answered from 10-K annual filings?
-   The following are NOT in 10-K filings and must be set to out_of_scope:
-   - Current or historical stock prices
-   - Analyst ratings or price targets
-   - Earnings call transcripts
-   - Recent news or press releases
-   - Forward guidance not filed with the SEC
+1. SCOPE CHECK — Mark as out_of_scope only when you are highly confident that no 10-K filing could ever contain this type of information by design (e.g. stock prices, analyst ratings, earnings call transcripts). When in doubt, proceed to retrieval — if the information is absent from the filing, the downstream QA step will say so explicitly.
    If out_of_scope, set query_type to out_of_scope and skip to OUTPUT FIELDS with an empty tasks list.
 2. PRONOUN & REFERENCE RESOLUTION — You must always complete this step before deciding on resolved_query. Determine whether the query contains any pronouns ("they", "their", "it", "that company", "same metric", "the following", etc.) or implicit references to prior conversation. If yes, resolve them using conversation history. If pronouns cannot be resolved because no prior context is available, or because the conversation history covers a different topic and does not clarify the referent, set query_type to "out_of_scope" and note the ambiguity in the reasoning field. If no pronouns or implicit references were found, proceed directly to ticker normalisation (Step 3) before writing `resolved_query`.
 3. TICKER NORMALISATION — Map company names to ticker symbols. Eg Apple → AAPL, Google/Alphabet → GOOGL, TSMC → TSM (use the US-listed symbol when available). If a company name cannot be confidently mapped to a known public ticker (e.g. a private company like OpenAI, a subsidiary, or an ambiguous name), set query_type to "out_of_scope" and note the ambiguity in the reasoning field.
