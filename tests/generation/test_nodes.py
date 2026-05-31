@@ -399,6 +399,24 @@ def test_retrieve_passes_filter_to_retriever():
     assert retriever.retrieve.call_args[1]["filters"] == f
 
 
+def test_retrieve_degrades_on_error_without_aborting():
+    # A single task's failure must not write a terminal answer or has_error (those have
+    # no reducer and would clash across parallel Sends). It returns empty results only,
+    # and is NOT recorded in failed_queries (that would suppress a retry of a transient failure).
+    retriever = MagicMock()
+    retriever.retrieve.side_effect = RuntimeError("db connection dropped")
+    embedder = MagicMock()
+    embedder.embed.return_value = [[0.1] * 1024]
+
+    node = make_retrieve(retriever, embedder)
+    output = node({"task": RetrievalTask(keyword_query="revenue", semantic_query="What was the revenue?")})
+
+    assert output == {"completed_results": [[]]}
+    assert "has_error" not in output
+    assert "answer" not in output
+    assert "failed_queries" not in output
+
+
 # ---------------------------------------------------------------------------
 # generate
 # ---------------------------------------------------------------------------

@@ -6,7 +6,7 @@ from generation.nodes._stream import get_writer
 
 from etl.embedder.base import Embedder
 from retrieval.retriever import Retriever
-from generation.types import GenerationResult, RetrievalTask
+from generation.types import RetrievalTask
 
 logger = logging.getLogger(__name__)
 
@@ -44,12 +44,14 @@ def make_retrieve(retriever: Retriever, embedder: Embedder) -> Callable[[Retriev
                 filters=task.filter,
             )
         except Exception:
+            # Best-effort: a single task's failure must not abort the whole query.
+            # Return empty results (no has_error/answer — those have no reducer and would
+            # clash across parallel Sends, and a terminal answer here would discard the
+            # other tasks' results and any prior-hop context). The query is deliberately
+            # NOT added to failed_queries: that list means "ran, returned zero" and tells
+            # check_hop never to retry — but a transient failure may succeed on a re-attempt.
             logger.exception("retrieve failed for query %r.", task.keyword_query)
-            return {
-                "completed_results": [[]],
-                "has_error": True,
-                "answer": GenerationResult(answer="Something went wrong — please try again.", citations=[]),
-            }
+            return {"completed_results": [[]]}
 
         logger.debug(
             "Retrieved %d result(s) for keyword_query %r (filter=%s).",
