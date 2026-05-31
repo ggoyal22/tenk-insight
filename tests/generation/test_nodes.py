@@ -11,7 +11,7 @@ import pytest
 from config.loader import GenerationConfig
 from generation.nodes.analyze_query import make_analyze_query
 from generation.nodes.check_hop import make_check_hop
-from generation.nodes.generate import make_generate, _select_prompt, _filter_by_indices
+from generation.nodes.generate import make_generate, _select_prompt, _cited_results
 from generation.nodes.hyde import make_hyde_expand
 from generation.nodes.reflect import make_reflect
 from generation.nodes.retrieve import make_retrieve, RetrieveInput
@@ -437,7 +437,7 @@ def test_generate_returns_generation_result():
 
 
 def test_generate_builds_citations_from_results():
-    llm = _make_llm(structured_return=_make_gen_response("Answer.", [1]))
+    llm = _make_llm(structured_return=_make_gen_response("Answer [1].", [1]))
     result = _make_retrieval_result()
 
     node = make_generate(llm, "Answer the question.", "Compare the companies.")
@@ -448,7 +448,7 @@ def test_generate_builds_citations_from_results():
 
 
 def test_generate_deduplicates_citations():
-    llm = _make_llm(structured_return=_make_gen_response("Answer.", [1]))
+    llm = _make_llm(structured_return=_make_gen_response("Answer [1].", [1]))
     result = _make_retrieval_result()
 
     node = make_generate(llm, "Answer the question.", "Compare the companies.")
@@ -521,7 +521,7 @@ def test_generate_falls_back_to_rrf_score_when_no_reranker():
     assert context.index("HIGH RRF CHUNK") < context.index("LOW RRF CHUNK")
 
 
-def test_generate_filters_citations_to_cited_indices():
+def test_generate_cites_only_inline_marked_results():
     filing = _make_filing()
     parent1 = _make_parent_chunk(filing.id)
     parent2 = ParentChunkRecord(
@@ -575,15 +575,26 @@ def test_generate_citation_keeps_context_index_when_earlier_excerpt_skipped():
     assert output["answer"].citations[0].section == parent2.section
 
 
-def test_generate_falls_back_to_all_citations_when_none_cited():
+def test_generate_refusal_answer_produces_no_citations():
+    # An answer with no inline [N] markers cites nothing, even if results were retrieved
+    # and even if the model still populated cited_indices (which we do not use to render).
     result1 = _make_retrieval_result()
     result2 = _make_retrieval_result()
 
-    llm = _make_llm(structured_return=_make_gen_response("I cannot determine this.", []))
+    llm = _make_llm(structured_return=_make_gen_response("I cannot determine this from the filings.", [1, 2]))
     node = make_generate(llm, "Answer the question.", "Compare the companies.")
     output = node(_base_state(completed_results=[[result1, result2]]))
 
-    assert len(output["answer"].citations) == 2
+    assert output["answer"].citations == []
+
+
+def test_cited_results_drops_out_of_range_and_duplicate_markers():
+    results = [_make_retrieval_result(), _make_retrieval_result()]
+
+    # [1] appears twice (dedupe to one), [5] is out of range (dropped), order preserved.
+    cited = _cited_results("First [1]. Again [1]. Out of range [5]. Second [2].", results)
+
+    assert cited == [(1, results[0]), (2, results[1])]
 
 
 @pytest.mark.parametrize("query_type,expected_keyword", [

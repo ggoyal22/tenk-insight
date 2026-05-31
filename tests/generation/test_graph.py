@@ -131,7 +131,7 @@ def test_single_query_produces_answer():
             return StructuredResponse(parsed=_make_query_plan(), usage=_usage())
         if schema == GenerationResponse:
             return StructuredResponse(
-                parsed=GenerationResponse(reasoning="Test reasoning.", answer="Revenue was $60.9B.", cited_indices=[1]),
+                parsed=GenerationResponse(reasoning="Test reasoning.", answer="Revenue was $60.9B [1].", cited_indices=[1]),
                 usage=_usage(),
             )
         raise ValueError(f"Unexpected schema: {schema}")
@@ -142,7 +142,7 @@ def test_single_query_produces_answer():
     final = graph.invoke(make_initial_state("What was NVDA's revenue in 2024?"))
 
     assert isinstance(final["answer"], GenerationResult)
-    assert final["answer"].answer == "Revenue was $60.9B."
+    assert final["answer"].answer == "Revenue was $60.9B [1]."
     assert len(final["answer"].citations) == 1
 
 

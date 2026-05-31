@@ -1,4 +1,5 @@
 import logging
+import re
 from collections.abc import Callable
 from uuid import UUID
 
@@ -46,7 +47,7 @@ def make_generate(
                 "answer": GenerationResult(answer="Something went wrong — please try again.", citations=[]),
             }
 
-        indexed_results = _filter_by_indices(results, response.parsed.cited_indices)
+        indexed_results = _cited_results(response.parsed.answer, results)
         citations = _build_citations(indexed_results)
 
         logger.debug(
@@ -91,16 +92,27 @@ def _deduplicate(completed_results: list[list[RetrievalResult]]) -> list[Retriev
     return sorted(unique.values(), key=lambda r: best_score[r.parent_chunk.id], reverse=True)
 
 
-def _filter_by_indices(results: list[RetrievalResult], cited_indices: list[int]) -> list[tuple[int, RetrievalResult]]:
-    """Pair each cited result with the 1-based index the model used to cite it.
+_INLINE_CITATION = re.compile(r"\[(\d+)\]")
 
-    That index is what the model wrote as [N] in the answer text, so it must travel
-    with the result into the citation — renumbering by list position would misalign
-    the markers once uncited excerpts are dropped. Falls back to every result (in
-    context order) when the model cited nothing usable.
+
+def _cited_results(answer: str, results: list[RetrievalResult]) -> list[tuple[int, RetrievalResult]]:
+    """Select citations from the inline [N] markers in the answer text.
+
+    The inline markers are part of the prose, so the rendered citation cards always
+    match what the answer actually claims to draw on. This is why we read them from the
+    answer rather than the model's separate cited_indices list, which can disagree with
+    the text (e.g. a "no relevant context" answer that still lists indices).
+    Out-of-range and duplicate markers are ignored; an answer with no markers cites nothing.
+    The original [N] index is preserved in the tuple so source cards match the answer markers.
     """
-    cited = [(i, results[i - 1]) for i in cited_indices if 1 <= i <= len(results)]
-    return cited if cited else list(enumerate(results, start=1))
+    seen: set[int] = set()
+    cited: list[tuple[int, RetrievalResult]] = []
+    for match in _INLINE_CITATION.finditer(answer):
+        i = int(match.group(1))
+        if 1 <= i <= len(results) and i not in seen:
+            seen.add(i)
+            cited.append((i, results[i - 1]))
+    return cited
 
 
 def _build_citations(indexed_results: list[tuple[int, RetrievalResult]]) -> list[Citation]:
