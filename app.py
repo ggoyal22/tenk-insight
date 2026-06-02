@@ -39,6 +39,7 @@ SUGGESTED_QUESTIONS = [
 
 def _citation_to_dict(c: Citation) -> dict:
     return {
+        "index": c.index,
         "ticker": c.ticker,
         "company_name": c.company_name,
         "form_type": c.form_type,
@@ -70,9 +71,9 @@ def render_citations(citations: list[dict]) -> None:
     if not citations:
         return
     st.markdown(f"**Sources ({len(citations)})**")
-    for i, c in enumerate(citations, 1):
+    for c in citations:
         label = (
-            f"[{i}] {c['company_name']} ({c['ticker']})"
+            f"[{c['index']}] {c['company_name']} ({c['ticker']})"
             f" · {c['form_type']}"
             f" · filed {c['filing_date']}"
             f" · {c['section']}"

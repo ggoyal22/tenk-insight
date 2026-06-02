@@ -75,6 +75,9 @@ class GenerationResponse(BaseModel):
 
 @dataclass
 class Citation:
+    # 1-based number the model used to cite this excerpt; rendered as [N] in the
+    # source list so it matches the [N] markers in the answer text.
+    index: int
     ticker: str
     company_name: str
     form_type: str

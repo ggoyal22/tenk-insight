@@ -182,6 +182,7 @@ def test_reflection_decision_has_json_schema():
 
 def test_citation_fields():
     c = Citation(
+        index=1,
         ticker="NVDA",
         company_name="NVIDIA Corporation",
         form_type="10-K",
@@ -192,6 +193,7 @@ def test_citation_fields():
         section="Financial Statements",
         chunk_text="Total revenue was $60.9 billion for fiscal 2024.",
     )
+    assert c.index == 1
     assert c.ticker == "NVDA"
     assert c.fiscal_year_end == date(2024, 1, 28)
 

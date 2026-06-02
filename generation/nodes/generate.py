@@ -46,8 +46,8 @@ def make_generate(
                 "answer": GenerationResult(answer="Something went wrong — please try again.", citations=[]),
             }
 
-        cited_results = _filter_by_indices(results, response.parsed.cited_indices)
-        citations = _build_citations(cited_results)
+        indexed_results = _filter_by_indices(results, response.parsed.cited_indices)
+        citations = _build_citations(indexed_results)
 
         logger.debug(
             "Answer generated (%d chars, %d citation(s)).",
@@ -91,14 +91,22 @@ def _deduplicate(completed_results: list[list[RetrievalResult]]) -> list[Retriev
     return sorted(unique.values(), key=lambda r: best_score[r.parent_chunk.id], reverse=True)
 
 
-def _filter_by_indices(results: list[RetrievalResult], cited_indices: list[int]) -> list[RetrievalResult]:
-    cited = [results[i - 1] for i in cited_indices if 1 <= i <= len(results)]
-    return cited if cited else results
+def _filter_by_indices(results: list[RetrievalResult], cited_indices: list[int]) -> list[tuple[int, RetrievalResult]]:
+    """Pair each cited result with the 1-based index the model used to cite it.
+
+    That index is what the model wrote as [N] in the answer text, so it must travel
+    with the result into the citation — renumbering by list position would misalign
+    the markers once uncited excerpts are dropped. Falls back to every result (in
+    context order) when the model cited nothing usable.
+    """
+    cited = [(i, results[i - 1]) for i in cited_indices if 1 <= i <= len(results)]
+    return cited if cited else list(enumerate(results, start=1))
 
 
-def _build_citations(results: list[RetrievalResult]) -> list[Citation]:
+def _build_citations(indexed_results: list[tuple[int, RetrievalResult]]) -> list[Citation]:
     return [
         Citation(
+            index=i,
             ticker=r.filing.ticker,
             company_name=r.filing.company_name,
             form_type=r.filing.form_type,
@@ -109,5 +117,5 @@ def _build_citations(results: list[RetrievalResult]) -> list[Citation]:
             section=r.parent_chunk.section,
             chunk_text=r.parent_chunk.text,
         )
-        for r in results
+        for i, r in indexed_results
     ]

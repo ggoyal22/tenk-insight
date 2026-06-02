@@ -17,9 +17,9 @@ def _format_citations(citations: list[Citation]) -> str:
     if not citations:
         return ""
     lines = ["\nSources:"]
-    for i, c in enumerate(citations, 1):
+    for c in citations:
         lines.append(
-            f"  [{i}] {c.company_name} ({c.ticker}) · {c.form_type} "
+            f"  [{c.index}] {c.company_name} ({c.ticker}) · {c.form_type} "
             f"filed {c.filing_date} · {c.section}"
         )
     return "\n".join(lines)

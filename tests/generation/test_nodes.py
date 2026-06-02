@@ -528,6 +528,35 @@ def test_generate_filters_citations_to_cited_indices():
     assert output["answer"].citations[0].section == parent1.section
 
 
+def test_generate_citation_keeps_context_index_when_earlier_excerpt_skipped():
+    """A cited excerpt must keep the [N] the model used, even when earlier excerpts
+    are dropped — otherwise the source label no longer matches the answer's markers."""
+    filing = _make_filing()
+    parent1 = _make_parent_chunk(filing.id)
+    parent2 = ParentChunkRecord(
+        id=uuid.uuid4(), filing_id=filing.id, chunk_index=1, section="Risk Factors",
+        text="Competition is intense.", token_count=3, content_hash="c" * 64,
+        created_at=datetime(2024, 3, 1),
+    )
+    result1 = RetrievalResult(
+        score=0.9, vector_score=None, keyword_score=None, reranker_score=None,
+        chunk=_make_chunk(filing.id, parent1.id), parent_chunk=parent1, filing=filing,
+    )
+    result2 = RetrievalResult(
+        score=0.8, vector_score=None, keyword_score=None, reranker_score=None,
+        chunk=_make_chunk(filing.id, parent2.id), parent_chunk=parent2, filing=filing,
+    )
+
+    # Model draws only from the second excerpt and writes [2] in the answer.
+    llm = _make_llm(structured_return=_make_gen_response("Competition is intense [2].", [2]))
+    node = make_generate(llm, "Answer the question.", "Compare the companies.")
+    output = node(_base_state(completed_results=[[result1, result2]]))
+
+    assert len(output["answer"].citations) == 1
+    assert output["answer"].citations[0].index == 2
+    assert output["answer"].citations[0].section == parent2.section
+
+
 def test_generate_falls_back_to_all_citations_when_none_cited():
     result1 = _make_retrieval_result()
     result2 = _make_retrieval_result()
