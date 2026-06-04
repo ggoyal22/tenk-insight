@@ -263,7 +263,8 @@ class EvaluationConfig(BaseModel):
     )
     datasets: list[str] = Field(default_factory=lambda: ["single", "multi_hop", "comparison"])
     # golden_path=None → reference-required metrics (context_recall, answer_correctness)
-    # are skipped automatically; set to a YAML file path to enable them
+    # are skipped automatically; set to a YAML file path to enable them.
+    # A relative path is resolved against the project root at load time.
     golden_path: str | None = None
     results: ResultsConfig = Field(default_factory=ResultsConfig)
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "INFO"
@@ -479,6 +480,13 @@ def _load_eval() -> EvaluationConfig:
     }
     evaluator_data = {**eval_yaml.get("evaluator", {}), "judge_llm": judge_llm_data}
     eval_final = {**eval_yaml, "evaluator": evaluator_data}
+
+    # Resolve a relative golden_path against the project root so evaluation runs
+    # from any working directory, mirroring raw_data_dir resolution in _load().
+    # An absolute path is left unchanged by the / operator.
+    golden_path = eval_final.get("golden_path")
+    if golden_path:
+        eval_final["golden_path"] = str((_PROJECT_ROOT / golden_path).resolve())
 
     return EvaluationConfig(**eval_final)
 
