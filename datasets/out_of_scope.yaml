@@ -1,0 +1,124 @@
+# Out-of-scope golden dataset.
+#
+# Covers distinct out-of-scope categories:
+#   1. Ticker entirely absent from corpus (e.g. GOOGL, AMZN, INTC)
+#   2. Real-time / post-filing market data (stock price)
+#   3. Ticker in corpus but requested year not in any filing
+#   4. Filing in corpus is a Part III amendment only (TSLA) — no financials
+#   5. Information type inherently absent from 10-K filings
+#      (analyst targets, forward guidance, per-unit pricing)
+#   6. Completely irrelevant (non-financial) question
+#   7. Data exists in a different SEC filing type (proxy/DEF 14A), not 10-K
+#
+# Answer field reflects the actual pipeline canned response:
+#   - LLM classifies out_of_scope  -> "This question can't be answered from SEC 10-K filings."
+#   - Ticker has no indexed filings -> "I don't have filings indexed for <TICKER>."
+#   - Passes ticker check, retrieval returns nothing -> generate-node "no relevant info" response
+
+- query: What is the caloric content and macronutrient breakdown of a standard slice of New
+    York-style pepperoni pizza?
+  query_type: out_of_scope
+  difficulty: easy
+  answer: |
+    This question can't be answered from SEC 10-K filings.
+- query: What was Alphabet Inc.'s revenue from YouTube advertising for fiscal year 2025, and
+    how did it compare to fiscal year 2024?
+  query_type: out_of_scope
+  difficulty: hard
+  answer: |
+    I don't have filings indexed for GOOGL.
+- query: What was NVIDIA's closing stock price on May 10, 2026?
+  query_type: out_of_scope
+  difficulty: hard
+  answer: |
+    This question can't be answered from SEC 10-K filings.
+- query: How much did Apple report in total net sales from its Mac product category for fiscal
+    year 2019 (ended September 28, 2019)?
+  query_type: out_of_scope
+  difficulty: hard
+  answer: |
+    No relevant information was retrieved. The Apple filing in the corpus covers fiscal year 2025 (ended September 27, 2025) with comparatives for FY2024 and FY2023 only. Fiscal year 2019 data is not present in any available filing.
+- query: What was NVIDIA's total revenue from its gaming segment in fiscal year 2020 (ended
+    January 26, 2020)?
+  query_type: out_of_scope
+  difficulty: hard
+  answer: |
+    No relevant information was retrieved. The NVIDIA filings in the corpus cover fiscal years 2024 and 2025, with comparatives extending no further back than fiscal year 2022. Fiscal year 2020 data is not present in any available filing.
+- query: What was Tesla's automotive gross margin excluding regulatory credits for fiscal
+    year 2025, and how did it change year over year?
+  query_type: out_of_scope
+  difficulty: hard
+  answer: |
+    No relevant information was retrieved. The only Tesla filing in the corpus is a 10-K/A amendment for fiscal year ended December 31, 2025, which contains only Part III information (directors, executive compensation, security ownership). It includes no financial statements or MD&A. Automotive gross margin data is not present in the available filing.
+- query: What was the average Wall Street analyst consensus price target for Pfizer stock
+    as of the date Pfizer filed its fiscal year 2025 annual report?
+  query_type: out_of_scope
+  difficulty: hard
+  answer: |
+    This question can't be answered from SEC 10-K filings.
+- query: What specific revenue figures did Microsoft project for its Intelligent Cloud segment
+    for fiscal year 2026, as stated in its fiscal year 2025 annual report?
+  query_type: out_of_scope
+  difficulty: hard
+  answer: |
+    This question can't be answered from SEC 10-K filings.
+- query: What was Pfizer's U.S. net realized price per five-day course of Paxlovid treatment
+    for fiscal year 2025, as reported in its annual filing?
+  query_type: out_of_scope
+  difficulty: hard
+  answer: |
+    This question can't be answered from SEC 10-K filings.
+- query: What was NVIDIA CEO Jensen Huang's total compensation for fiscal year 2025, including
+    base salary, bonus, and equity awards?
+  query_type: out_of_scope
+  difficulty: hard
+  answer: |
+    No relevant information was retrieved. NVIDIA's fiscal year 2025 10-K explicitly states that executive compensation information is omitted from the filing and incorporated by reference from the company's 2025 Proxy Statement (DEF 14A). The Summary Compensation Table is in the proxy filing, which is not ingested in this corpus.
+- query: How did AMD's data center GPU revenue in fiscal year 2025 stack up against Intel's
+    Data Center and AI segment revenue for the same year?
+  query_type: out_of_scope
+  difficulty: hard
+  answer: |
+    I don't have filings indexed for INTC.
+- query: What was the operating income of Amazon Web Services in fiscal year 2025, and what
+    share of Amazon's consolidated operating income did it represent?
+  query_type: out_of_scope
+  difficulty: hard
+  answer: |
+    I don't have filings indexed for AMZN.
+- query: What were ExxonMobil's total revenues and other income for fiscal year 2021 (ended
+    December 31, 2021), and how did upstream earnings recover from the prior year?
+  query_type: out_of_scope
+  difficulty: hard
+  answer: |
+    No relevant information was retrieved. The ExxonMobil filings in the corpus cover fiscal years 2024 and 2025, with comparatives extending no further back than fiscal year 2023. Fiscal year 2021 data is not present in any available filing.
+- query: What were AMD's Data Center segment net revenue and operating income in fiscal year
+    2022, and what drove the year-over-year change?
+  query_type: out_of_scope
+  difficulty: hard
+  answer: |
+    No relevant information was retrieved. The AMD filings in the corpus cover fiscal years 2024 and 2025, with comparatives extending no further back than fiscal year 2023. Fiscal year 2022 data is not present in any available filing.
+- query: How many commercial aircraft does Boeing expect to deliver in fiscal year 2026, and
+    what 737 MAX monthly production rate is the company targeting next year?
+  query_type: out_of_scope
+  difficulty: hard
+  answer: |
+    This question can't be answered from SEC 10-K filings.
+- query: What was Apple's average selling price per iPhone unit in fiscal year 2025, and how
+    did it move year over year?
+  query_type: out_of_scope
+  difficulty: hard
+  answer: |
+    This question can't be answered from SEC 10-K filings.
+- query: What was the total compensation reported for Pfizer's Chief Executive Officer in
+    fiscal year 2025, broken down into base salary, annual cash incentive, and equity awards?
+  query_type: out_of_scope
+  difficulty: hard
+  answer: |
+    No relevant information was retrieved. Pfizer's fiscal year 2025 10-K omits executive compensation information and incorporates it by reference from the company's 2026 Proxy Statement (DEF 14A). The Summary Compensation Table is in the proxy filing, which is not ingested in this corpus.
+- query: How many vehicles did Tesla deliver in fiscal year 2025, and what was its total automotive
+    revenue for the year?
+  query_type: out_of_scope
+  difficulty: hard
+  answer: |
+    No relevant information was retrieved. The only Tesla filing in the corpus is a 10-K/A amendment for fiscal year ended December 31, 2025, which contains only Part III information (directors, executive compensation, security ownership). It includes no financial statements or operating metrics. Vehicle delivery and automotive revenue data are not present in the available filing.

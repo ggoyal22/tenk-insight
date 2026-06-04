@@ -1,0 +1,482 @@
+- query: What were ExxonMobil's earnings per common share and dividends paid per common share
+    in fiscal year 2024 and fiscal year 2025?
+  query_type: comparison
+  difficulty: medium
+  expected_tasks:
+  - filter:
+      ticker: XOM
+      form_type: 10-K
+      fiscal_year: '2024'
+      section: '8'
+      query: ExxonMobil earnings per common share dividends paid per common share fiscal year
+        2024
+  - filter:
+      ticker: XOM
+      form_type: 10-K
+      fiscal_year: '2025'
+      section: '8'
+      query: ExxonMobil earnings per common share dividends paid per common share fiscal year
+        2025
+  answer: |
+    In fiscal year 2024, ExxonMobil's earnings per common share were $7.84 and dividends paid per common share were $3.84. In fiscal year 2025, earnings per common share were $6.70 and dividends paid per common share were $4.00.
+- query: What was ExxonMobil's total worldwide oil-equivalent production in thousands of oil-equivalent
+    barrels daily in fiscal year 2024 and fiscal year 2025?
+  query_type: comparison
+  difficulty: medium
+  expected_tasks:
+  - filter:
+      ticker: XOM
+      form_type: 10-K
+      fiscal_year: '2024'
+      section: '2'
+      query: ExxonMobil total worldwide oil-equivalent production barrels daily fiscal year
+        2024
+  - filter:
+      ticker: XOM
+      form_type: 10-K
+      fiscal_year: '2025'
+      section: '2'
+      query: ExxonMobil total worldwide oil-equivalent production barrels daily fiscal year
+        2025
+  answer: |
+    ExxonMobil's total worldwide oil-equivalent production was 4,333 thousand oil-equivalent barrels daily in fiscal year 2024 and 4,736 thousand oil-equivalent barrels daily in fiscal year 2025.
+- query: How did ExxonMobil's dividends paid per common share for fiscal year 2024 compare
+    to Pfizer's cash dividends declared per common share for fiscal year 2024?
+  query_type: comparison
+  difficulty: medium
+  expected_tasks:
+  - filter:
+      ticker: XOM
+      form_type: 10-K
+      fiscal_year: '2024'
+      section: '8'
+      query: ExxonMobil dividends paid per common share fiscal year 2024
+  - filter:
+      ticker: PFE
+      form_type: 10-K
+      fiscal_year: '2024'
+      section: '8'
+      query: Pfizer cash dividends declared per common share fiscal year 2024
+  answer: |
+    ExxonMobil's dividends paid per common share in fiscal year 2024 were $3.84. Pfizer's cash dividends declared per common share in fiscal year 2024 were $1.61.
+- query: What were ExxonMobil's and Pfizer's net income attributable to each company's common
+    shareholders and earnings per common share in fiscal year 2025?
+  query_type: comparison
+  difficulty: medium
+  expected_tasks:
+  - filter:
+      ticker: XOM
+      form_type: 10-K
+      fiscal_year: '2025'
+      section: '8'
+      query: ExxonMobil net income attributable earnings per common share fiscal year 2025
+  - filter:
+      ticker: PFE
+      form_type: 10-K
+      fiscal_year: '2025'
+      section: '8'
+      query: Pfizer net income attributable common shareholders earnings per share fiscal
+        year 2025
+  answer: |
+    ExxonMobil's net income attributable to ExxonMobil was $28,844 million in fiscal year 2025, with earnings per common share of $6.70. Pfizer's net income attributable to Pfizer Inc. common shareholders was $7,771 million in fiscal year 2025, with net income per common share of $1.36.
+- query: What goodwill balances did NVIDIA and AMD each carry on their balance sheets at the
+    end of their respective fiscal years 2024?
+  query_type: comparison
+  difficulty: medium
+  expected_tasks:
+  - filter:
+      ticker: NVDA
+      form_type: 10-K
+      fiscal_year: '2024'
+      section: '8'
+      query: NVIDIA goodwill balance sheet fiscal year 2024
+  - filter:
+      ticker: AMD
+      form_type: 10-K
+      fiscal_year: '2024'
+      section: '8'
+      query: AMD goodwill balance sheet fiscal year 2024
+  answer: |
+    At the end of NVIDIA's fiscal year 2024 (January 28, 2024), NVIDIA's goodwill was $4,430 million. At the end of AMD's fiscal year 2024 (December 28, 2024), AMD's goodwill was $24,839 million.
+- query: How many total employees or qualifying individuals did Tesla and Boeing each have
+    as of December 31, 2025, and what percentage of each company's workforce was based outside
+    the United States?
+  query_type: comparison
+  difficulty: medium
+  answer: |
+    As of December 31, 2025, Tesla had 135,623 qualifying individuals in its pay ratio analysis (full-time, part-time, and temporary employees, excluding Elon Musk and staffing agency employees), of whom approximately 43% were based outside the United States. Boeing had a total workforce of approximately 182,000, of whom approximately 14% were located outside the United States.
+- query: Which accounting firm conducted the annual financial statement audit for Tesla and
+    which for Boeing in fiscal year 2025, and in what city was each firm's audit engagement
+    based?
+  query_type: comparison
+  difficulty: medium
+  answer: |
+    PricewaterhouseCoopers LLP, based in San Jose, California, served as Tesla's external auditor for fiscal year 2025. Deloitte & Touche LLP, based in Seattle, Washington, served as Boeing's external auditor for fiscal year 2025.
+- query: What proportion of Boeing's total workforce was represented by its largest union
+    as of December 31, 2025, and what proportion of Tesla's pay ratio qualifying workforce
+    consisted of production line employees as of the same date?
+  query_type: comparison
+  difficulty: medium
+  answer: |
+    As of December 31, 2025, the International Association of Machinists and Aerospace Workers (IAM), Boeing's largest union, represented 25% of Boeing's total workforce of approximately 182,000, as disclosed in Boeing's fiscal year 2025 10-K. Approximately 33% of Tesla's 135,623 pay ratio qualifying employees were production line employees, as disclosed in Tesla's fiscal year 2025 annual filing.
+- query: How did Apple's effective tax rate for fiscal year 2025 compare to Microsoft's effective
+    tax rate for fiscal year 2025?
+  query_type: comparison
+  difficulty: medium
+  expected_tasks:
+  - filter:
+      ticker: AAPL
+      form_type: 10-K
+      fiscal_year: '2025'
+      section: '8'
+      query: Apple effective tax rate fiscal year 2025
+  - filter:
+      ticker: MSFT
+      form_type: 10-K
+      fiscal_year: '2025'
+      section: '7'
+      query: Microsoft effective tax rate fiscal year 2025
+  answer: |
+    Apple's effective tax rate for fiscal year 2025 was 15.6%, down from 24.1% in fiscal year 2024 (the prior-year rate was elevated by the State Aid Decision). Microsoft's effective tax rate for fiscal year 2025 was 18%, the same as fiscal year 2024. Microsoft's rate was therefore higher than Apple's in fiscal year 2025.
+- query: What were Microsoft's and Pfizer's total research and development expenses in fiscal
+    year 2025, and how did each company's R&D expense change from the prior fiscal year?
+  query_type: comparison
+  difficulty: medium
+  expected_tasks:
+  - filter:
+      ticker: MSFT
+      form_type: 10-K
+      fiscal_year: '2025'
+      section: '8'
+      query: Microsoft research and development expenses fiscal year 2025 and 2024
+  - filter:
+      ticker: PFE
+      form_type: 10-K
+      fiscal_year: '2025'
+      section: '8'
+      query: Pfizer research and development expenses fiscal year 2025 and 2024
+  answer: |
+    Microsoft's research and development expenses were $32,488 million in fiscal year 2025, up from $29,510 million in fiscal year 2024, an increase of $3.0 billion or 10% driven by investments in cloud and AI engineering and Gaming, including the impact of the Activision Blizzard acquisition. Pfizer's research and development expenses were $10,437 million in 2025, down from $10,822 million in 2024, a decrease of $385 million primarily driven by a net decrease in spending from pipeline focus and optimization initiatives and lower compensation-related expenses.
+- query: During fiscal year 2025, how many shares of common stock did Apple and Microsoft
+    each repurchase, and how much cash did each company spend on those repurchases?
+  query_type: comparison
+  difficulty: medium
+  expected_tasks:
+  - filter:
+      ticker: AAPL
+      form_type: 10-K
+      fiscal_year: '2025'
+      section: '8'
+      query: Apple shares repurchased and cash spent fiscal year 2025
+  - filter:
+      ticker: MSFT
+      form_type: 10-K
+      fiscal_year: '2025'
+      section: '7'
+      query: Microsoft shares repurchased and cash spent fiscal year 2025
+  answer: |
+    During fiscal year 2025, Apple repurchased 402 million shares of its common stock for $89.3 billion. During fiscal year 2025, Microsoft repurchased 31 million shares of its common stock for $13.0 billion (compared with 32 million shares for $12.0 billion in fiscal year 2024).
+- query: How much did Microsoft and Apple each invest in property and equipment (capital expenditures)
+    in fiscal year 2025 according to their cash flow statements?
+  query_type: comparison
+  difficulty: medium
+  expected_tasks:
+  - filter:
+      ticker: MSFT
+      form_type: 10-K
+      fiscal_year: '2025'
+      section: '8'
+      query: Microsoft additions to property and equipment fiscal year 2025 cash flow
+  - filter:
+      ticker: AAPL
+      form_type: 10-K
+      fiscal_year: '2025'
+      section: '8'
+      query: Apple payments for acquisition of property plant and equipment fiscal year 2025
+        cash flow
+  answer: |
+    In fiscal year 2025, Microsoft's additions to property and equipment were $64,551 million (up from $44,477 million in fiscal year 2024). In fiscal year 2025, Apple's payments for acquisition of property, plant and equipment were $12,715 million (up from $9,447 million in fiscal year 2024). Microsoft's capital expenditures were roughly five times Apple's in fiscal year 2025.
+- query: How did NVIDIA's total revenue for fiscal year 2025 compare to ExxonMobil's sales
+    and other operating revenue for fiscal year 2025?
+  query_type: comparison
+  difficulty: medium
+  expected_tasks:
+  - filter:
+      ticker: NVDA
+      form_type: 10-K
+      fiscal_year: '2025'
+      section: '7'
+      query: NVIDIA total revenue fiscal year 2025
+  - filter:
+      ticker: XOM
+      form_type: 10-K
+      fiscal_year: '2025'
+      section: '8'
+      query: ExxonMobil sales and other operating revenue fiscal year 2025
+  answer: |
+    NVIDIA's total revenue for fiscal year 2025 was $130,497 million, up 114% from $60,922 million in fiscal year 2024. ExxonMobil's sales and other operating revenue for fiscal year 2025 was $323,905 million (down from $339,247 million in 2024). ExxonMobil's revenue base was roughly 2.5 times NVIDIA's, though NVIDIA's was growing far faster.
+- query: How did Apple's total net sales trend from fiscal year 2024 to fiscal year 2025 compare
+    with ExxonMobil's total revenues and other income over the same period?
+  query_type: comparison
+  difficulty: medium
+  expected_tasks:
+  - filter:
+      ticker: AAPL
+      form_type: 10-K
+      fiscal_year: '2025'
+      section: '8'
+      query: Apple total net sales fiscal year 2025 versus 2024
+  - filter:
+      ticker: XOM
+      form_type: 10-K
+      fiscal_year: '2025'
+      section: '8'
+      query: ExxonMobil total revenues and other income fiscal year 2025 versus 2024
+  answer: |
+    Apple's total net sales rose from $391,035 million in fiscal year 2024 to $416,161 million in fiscal year 2025, an increase. ExxonMobil's total revenues and other income fell from $349,585 million in fiscal year 2024 to $332,238 million in fiscal year 2025, a decrease. The two companies moved in opposite directions: Apple's revenue grew while ExxonMobil's declined.
+- query: What were ExxonMobil's cumulative structural cost savings relative to 2019 as reported
+    in its fiscal year 2024 and fiscal year 2025 annual reports, and how much did the company
+    add in fiscal year 2025 alone?
+  query_type: comparison
+  difficulty: hard
+  expected_tasks:
+  - filter:
+      ticker: XOM
+      form_type: 10-K
+      fiscal_year: '2024'
+      section: '7'
+      query: ExxonMobil cumulative structural cost savings relative to 2019 fiscal year 2024
+  - filter:
+      ticker: XOM
+      form_type: 10-K
+      fiscal_year: '2025'
+      section: '7'
+      query: ExxonMobil cumulative structural cost savings relative to 2019 fiscal year 2025
+  answer: |
+    As reported in its fiscal year 2024 annual report, ExxonMobil's estimated cumulative structural cost savings relative to 2019 totaled $12.1 billion. As reported in its fiscal year 2025 annual report, cumulative structural cost savings totaled $15.1 billion, which included an additional $3.0 billion added in 2025.
+- query: How many total employees did NVIDIA have at the end of fiscal year 2024 versus fiscal
+    year 2025, and how was each workforce split between research and development and other
+    functions?
+  query_type: comparison
+  difficulty: hard
+  expected_tasks:
+  - filter:
+      ticker: NVDA
+      form_type: 10-K
+      fiscal_year: '2024'
+      section: '1'
+      query: NVIDIA total employee count R&D headcount end of fiscal year 2024
+  - filter:
+      ticker: NVDA
+      form_type: 10-K
+      fiscal_year: '2025'
+      section: '1'
+      query: NVIDIA total employee count R&D headcount end of fiscal year 2025
+  answer: |
+    At the end of fiscal year 2024, NVIDIA had approximately 29,600 employees; 22,200 were engaged in research and development and 7,400 were engaged in sales, marketing, operations, and administrative positions. At the end of fiscal year 2025, NVIDIA had approximately 36,000 employees; 27,100 were engaged in research and development and 8,900 were engaged in sales, marketing, operations, and administrative positions.
+- query: How did AMD's research and development expenses change from fiscal year 2024 to fiscal
+    year 2025 in dollar terms, and what primary factor drove the increase in each year?
+  query_type: comparison
+  difficulty: hard
+  expected_tasks:
+  - filter:
+      ticker: AMD
+      form_type: 10-K
+      fiscal_year: '2024'
+      section: '7'
+      query: AMD research and development expenses 2024 year-over-year change driver
+  - filter:
+      ticker: AMD
+      form_type: 10-K
+      fiscal_year: '2025'
+      section: '7'
+      query: AMD research and development expenses 2025 year-over-year change driver
+  answer: |
+    AMD's research and development expenses were $6.5 billion in fiscal year 2024, an increase of $584 million, or 10%, from $5.9 billion in 2023, primarily due to higher employee-related costs from an increase in headcount in support of AMD's AI strategy. In fiscal year 2025, research and development expenses were $8.1 billion, an increase of $1.6 billion, or 25%, from $6.5 billion in 2024, also primarily due to higher employee-related costs from an increase in headcount in support of AMD's continued focus on its AI strategy.
+- query: How many shares did NVIDIA and AMD each repurchase during their respective fiscal
+    years 2025, how much capital did each deploy, and what was each company's remaining buyback
+    authorization at fiscal year-end?
+  query_type: comparison
+  difficulty: hard
+  expected_tasks:
+  - filter:
+      ticker: NVDA
+      form_type: 10-K
+      fiscal_year: '2025'
+      section: '5'
+      query: NVIDIA shares repurchased fiscal year 2025 capital deployed remaining buyback
+        authorization
+  - filter:
+      ticker: AMD
+      form_type: 10-K
+      fiscal_year: '2025'
+      section: '7'
+      query: AMD shares repurchased fiscal year 2025 capital returned remaining buyback authorization
+  answer: |
+    During NVIDIA's fiscal year 2025, NVIDIA repurchased 310 million shares of its common stock for $34.0 billion; as of January 26, 2025, NVIDIA was authorized to repurchase up to $38.7 billion of additional common stock. During AMD's fiscal year 2025, AMD repurchased 12.4 million shares of common stock for $1.3 billion; as of December 27, 2025, $9.4 billion remained available for future stock repurchases under AMD's program.
+- query: How did NVIDIA's fiscal year 2024 annual report and AMD's fiscal year 2024 annual
+    report differ in their disclosure of specific products subject to U.S. government export
+    licensing requirements for China and other restricted destinations?
+  query_type: comparison
+  difficulty: hard
+  expected_tasks:
+  - filter:
+      ticker: NVDA
+      form_type: 10-K
+      fiscal_year: '2024'
+      section: '1'
+      query: NVIDIA specific products subject to U.S. export licensing requirements China
+        restrictions fiscal year 2024
+  - filter:
+      ticker: AMD
+      form_type: 10-K
+      fiscal_year: '2024'
+      section: 1A
+      query: AMD specific products export licensing requirements China export control fiscal
+        year 2024
+  answer: |
+    NVIDIA's fiscal year 2024 annual report disclosed specific products subject to U.S. government export licensing requirements, including A100 and H100 integrated circuits and DGX systems incorporating those chips (impacted from the third quarter of fiscal year 2023), and, effective in the fourth quarter of fiscal year 2024, A800, H800, L4, L40, L40S, and RTX 4090 for exports to China and Country Groups D1, D4, and D5 (including Saudi Arabia, the United Arab Emirates, and Vietnam, but excluding Israel). AMD's fiscal year 2024 annual report did not name specific data center GPU products subject to China-related export licensing requirements; instead AMD described export control as a general legal and regulatory risk that may limit its ability to export products to certain customers, and specifically noted that the Bureau of Industry and Security had added AMD's THATIC joint venture partners to the Entity List in June 2019.
+- query: What key production or energy output figure did Tesla's management highlight in the
+    fiscal year 2025 executive compensation discussion, and how many total commercial aircraft
+    did Boeing deliver in fiscal year 2025 compared to fiscal year 2024?
+  query_type: comparison
+  difficulty: hard
+  answer: |
+    In Tesla's fiscal year 2025 annual filing, management highlighted that Tesla deployed 46.7 gigawatt hours of energy storage in 2025, representing an increase of 48.7% compared to the prior year. In Boeing's fiscal year 2025 10-K, Boeing Commercial Airplanes delivered a total of 600 commercial aircraft (including intercompany deliveries), compared to 348 aircraft delivered in fiscal year 2024.
+- query: What total revenue did NVIDIA, Apple, and Microsoft each report for fiscal year 2025?
+  query_type: comparison
+  difficulty: hard
+  expected_tasks:
+  - filter:
+      ticker: NVDA
+      form_type: 10-K
+      fiscal_year: '2025'
+      section: '7'
+      query: NVIDIA total revenue fiscal year 2025
+  - filter:
+      ticker: AAPL
+      form_type: 10-K
+      fiscal_year: '2025'
+      section: '8'
+      query: Apple total net sales fiscal year 2025
+  - filter:
+      ticker: MSFT
+      form_type: 10-K
+      fiscal_year: '2025'
+      section: '8'
+      query: Microsoft total revenue fiscal year 2025
+  answer: |
+    For fiscal year 2025, NVIDIA reported total revenue of $130,497 million, Apple reported total net sales of $416,161 million, and Microsoft reported total revenue of $281,724 million. Apple had the largest top line of the three, followed by Microsoft and then NVIDIA.
+- query: How did the research and development expense for fiscal year 2025 compare across
+    NVIDIA, Microsoft, and Pfizer in dollar terms?
+  query_type: comparison
+  difficulty: hard
+  expected_tasks:
+  - filter:
+      ticker: NVDA
+      form_type: 10-K
+      fiscal_year: '2025'
+      section: '7'
+      query: NVIDIA research and development expenses fiscal year 2025
+  - filter:
+      ticker: MSFT
+      form_type: 10-K
+      fiscal_year: '2025'
+      section: '8'
+      query: Microsoft research and development expenses fiscal year 2025
+  - filter:
+      ticker: PFE
+      form_type: 10-K
+      fiscal_year: '2025'
+      section: '8'
+      query: Pfizer research and development expenses fiscal year 2025
+  answer: |
+    For fiscal year 2025, NVIDIA's research and development expenses were $12,914 million (9.9% of net revenue, up 49% from $8,675 million the prior year), Microsoft's were $32,488 million (up from $29,510 million), and Pfizer's were $10,437 million (down from $10,822 million). Microsoft spent the most on R&D in absolute dollars of the three, followed by NVIDIA and then Pfizer.
+- query: How much did Microsoft, Apple, and NVIDIA each spend on property and equipment (capital
+    expenditures) in fiscal year 2025?
+  query_type: comparison
+  difficulty: hard
+  expected_tasks:
+  - filter:
+      ticker: MSFT
+      form_type: 10-K
+      fiscal_year: '2025'
+      section: '8'
+      query: Microsoft additions to property and equipment fiscal year 2025
+  - filter:
+      ticker: AAPL
+      form_type: 10-K
+      fiscal_year: '2025'
+      section: '8'
+      query: Apple payments for acquisition of property plant and equipment fiscal year 2025
+  - filter:
+      ticker: NVDA
+      form_type: 10-K
+      fiscal_year: '2025'
+      section: '8'
+      query: NVIDIA purchases related to property and equipment and intangible assets fiscal
+        year 2025
+  answer: |
+    In fiscal year 2025, Microsoft's additions to property and equipment were $64,551 million, Apple's payments for acquisition of property, plant and equipment were $12,715 million, and NVIDIA's purchases related to property and equipment and intangible assets were $3,236 million. Microsoft's capital spending dwarfed the other two, reflecting its datacenter buildout, while NVIDIA's was the smallest of the three despite its rapid revenue growth.
+- query: How did ExxonMobil's fiscal year 2025 annual report and Pfizer's fiscal year 2025
+    annual report differ in disclosing specific greenhouse gas emission-reduction targets
+    and timelines?
+  query_type: comparison
+  difficulty: hard
+  expected_tasks:
+  - filter:
+      ticker: XOM
+      form_type: 10-K
+      fiscal_year: '2025'
+      section: 1A
+      query: ExxonMobil net zero greenhouse gas emission reduction targets Permian 2035 Pioneer
+        fiscal year 2025
+  - filter:
+      ticker: PFE
+      form_type: 10-K
+      fiscal_year: '2025'
+      section: 1A
+      query: Pfizer environmental greenhouse gas emissions net zero disclosure fiscal year
+        2025
+  answer: |
+    ExxonMobil's fiscal year 2025 annual report disclosed specific, dated emission goals: it described 2030 emission-intensity reduction plans incorporated into its medium-term business plans, and a plan to reach net-zero Scope 1 and 2 emissions in its integrated Permian Basin operated assets by 2035, including the Pioneer assets acquired in 2024. ExxonMobil also noted that current policy and technology trends are not yet on a pathway to achieve net-zero by 2050. Pfizer's fiscal year 2025 annual report did not set out comparable company-specific emission-reduction targets or timelines; instead it discussed environmental stewardship in general terms within its broader discussion of differing stakeholder views on responsible business practices, without specific net-zero dates analogous to ExxonMobil's.
+- query: How did AMD's fiscal year 2025 annual report and NVIDIA's fiscal year 2025 annual
+    report differ in disclosing a major business acquisition completed during the year, including
+    specific deal terms?
+  query_type: comparison
+  difficulty: hard
+  expected_tasks:
+  - filter:
+      ticker: AMD
+      form_type: 10-K
+      fiscal_year: '2025'
+      section: '7'
+      query: AMD ZT Systems acquisition fiscal year 2025 deal terms cash shares
+  - filter:
+      ticker: NVDA
+      form_type: 10-K
+      fiscal_year: '2025'
+      section: '8'
+      query: NVIDIA acquisitions completed fiscal year 2025 Arm termination goodwill
+  answer: |
+    AMD's fiscal year 2025 annual report disclosed a specific major acquisition with detailed terms: in March 2025 AMD completed the acquisition of ZT Systems for $3.2 billion in cash and 8.3 million shares of its common stock, retaining the ZT Design Business, and in October 2025 it sold the ZT data center infrastructure manufacturing business to Sanmina for $2.4 billion in cash plus 1.2 million Sanmina shares. NVIDIA's fiscal year 2025 annual report disclosed no comparable completed business acquisition of that scale; its acquisition-related disclosure instead centered on the earlier February 2022 termination of the Arm Share Purchase Agreement due to regulatory challenges, and its goodwill rose only modestly to $5.2 billion as of January 26, 2025 from $4.4 billion a year earlier.
+- query: How did Boeing's fiscal year 2025 annual report and ExxonMobil's fiscal year 2025
+    annual report differ in disclosing a specific product-safety event and resulting regulatory
+    production constraint?
+  query_type: comparison
+  difficulty: hard
+  expected_tasks:
+  - filter:
+      ticker: BA
+      form_type: 10-K
+      fiscal_year: '2025'
+      section: 1A
+      query: Boeing 737-9 door plug accident FAA production rate constraint fiscal year 2025
+  - filter:
+      ticker: XOM
+      form_type: 10-K
+      fiscal_year: '2025'
+      section: 1A
+      query: ExxonMobil regulatory and operational risk disclosure fiscal year 2025
+  answer: |
+    Boeing's fiscal year 2025 annual report disclosed a specific product-safety event and a resulting regulatory production constraint: following the 737-9 door plug accident in January 2024, the FAA investigated the 737 quality control system (including Spirit AeroSystems) and increased oversight, and the 737 program may only increase production rates and/or implement new production lines with the concurrence of the FAA. Boeing stated it slowed 737 production rates and delayed planned rate increases to reduce traveled work. ExxonMobil's fiscal year 2025 annual report did not disclose any such company-specific product-safety accident or a regulator-imposed cap on its output; instead it framed regulatory and technology matters as general industry and policy risks (for example, around emissions, lower-emission technologies such as carbon capture and storage, and shifting policy stringency).
