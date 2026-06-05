@@ -55,7 +55,7 @@ def _citation_to_dict(c: Citation) -> dict:
 @st.cache_resource(show_spinner="Loading pipeline...")
 def load_pipeline():
     config = load_config()
-    setup_tracing(config.tracing)
+    setup_tracing(config.tracing, project_name=f"ui-{config.environment}")
     client = create_db_client(config)
     if not client.health_check():
         raise RuntimeError("Database health check failed — is PostgreSQL running?")

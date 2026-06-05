@@ -130,6 +130,20 @@ def _wait_for_traces(db_path: str, since: datetime, timeout: int = 30) -> None:
     logger.warning("Timed out after %ds waiting for traces — proceeding with %d trace(s)", timeout, last_count)
 
 
+def _derive_project_name(golden_path: str | None, difficulty: str | None) -> str:
+    """Build the default Phoenix project name from the golden source and difficulty.
+
+    e.g. 'eval-datasets', 'eval-single-hard', or bare 'eval' when neither is set.
+    Path(...).stem drops the '.yaml' suffix (and is the dir name for a directory).
+    """
+    parts = ["eval"]
+    if golden_path:
+        parts.append(Path(golden_path).stem)
+    if difficulty:
+        parts.append(difficulty)
+    return "-".join(parts)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Run the RAG generation pipeline over golden queries and/or score traces with RAGAS.",
@@ -158,6 +172,13 @@ def main() -> None:
         "-d", "--difficulty", choices=["easy", "medium", "hard"],
         help="Run only golden queries of this difficulty (ignored with --eval-only)",
     )
+    parser.add_argument(
+        "-p", "--project-name", metavar="NAME",
+        help="Phoenix project for this run. When generating, defaults to a name "
+             "derived from the golden source and difficulty (e.g. eval-single-hard); "
+             "with --eval-only, restricts scoring to traces in this project "
+             "(omit to score all projects).",
+    )
     args = parser.parse_args()
 
     try:
@@ -179,12 +200,25 @@ def main() -> None:
     )
     logger = logging.getLogger(__name__)
 
+    # The project name couples the write side (generation traces are routed here)
+    # to the read side (the extractor scores traces from here). With --eval-only no
+    # traces are generated, so an omitted -p means "score all projects" (None).
+    if args.eval_only:
+        eval_project = args.project_name
+    else:
+        eval_project = args.project_name or _derive_project_name(
+            eval_config.golden_path, args.difficulty
+        )
+
     from tracing.setup import setup_tracing
     try:
-        setup_tracing(app_config.tracing)
+        setup_tracing(app_config.tracing, project_name=eval_project)
     except RuntimeError as exc:
         logger.critical("Failed to initialise tracing: %s", exc)
         sys.exit(1)
+
+    if eval_project:
+        logger.info("Phoenix project: %s", eval_project)
 
     since: datetime | None
 
@@ -260,7 +294,7 @@ def main() -> None:
 
     golden = load_golden(eval_config.golden_path)
     runner = EvaluationRunner(
-        extractor=build_extractor(eval_config),
+        extractor=build_extractor(eval_config, project_name=eval_project),
         evaluator=build_evaluator(eval_config),
         exporters=build_exporters(eval_config),
         golden=golden,

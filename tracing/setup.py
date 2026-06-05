@@ -3,28 +3,39 @@ import os
 
 from opentelemetry import trace
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from openinference.instrumentation.langchain import LangChainInstrumentor
+from openinference.semconv.resource import ResourceAttributes
 
 from config.loader import TracingConfig
 
 logger = logging.getLogger(__name__)
 
 
-def setup_tracing(config: TracingConfig) -> None:
+def setup_tracing(config: TracingConfig, project_name: str | None = None) -> None:
     """Configure the OTel tracer provider and instrument LangGraph.
 
     No-op when tracing.enabled is false — safe to call unconditionally at startup.
     When enabled, reads OTEL_EXPORTER_OTLP_ENDPOINT and OTEL_SERVICE_NAME from
     the environment automatically (standard OTel env vars, no code changes needed
     to switch backends).
+
+    project_name routes this process's spans to a named Phoenix project via the
+    openinference.project.name resource attribute. When None, spans land in the
+    Phoenix default project.
     """
     if not config.enabled:
         return
 
     try:
-        provider = TracerProvider()
+        resource = (
+            Resource.create({ResourceAttributes.PROJECT_NAME: project_name})
+            if project_name
+            else None
+        )
+        provider = TracerProvider(resource=resource)
         provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter()))
         trace.set_tracer_provider(provider)
         LangChainInstrumentor().instrument()

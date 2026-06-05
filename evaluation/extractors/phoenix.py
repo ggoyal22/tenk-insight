@@ -11,8 +11,9 @@ logger = logging.getLogger(__name__)
 
 
 class PhoenixExtractor(BaseExtractor):
-    def __init__(self, db_path: str) -> None:
+    def __init__(self, db_path: str, project_name: str | None = None) -> None:
         self._db_path = db_path
+        self._project_name = project_name
 
     def extract(
         self, datasets: list[str], since: datetime | None = None
@@ -53,13 +54,23 @@ class PhoenixExtractor(BaseExtractor):
         Out-of-scope queries terminate before generate and are excluded —
         RAGAS metrics require both a response and retrieved contexts.
         since: when set, restricts to traces whose start_time >= since (UTC).
+        project_name: when set, restricts to traces in that Phoenix project.
         """
-        sql = "SELECT DISTINCT trace_rowid FROM spans WHERE name = 'generate'"
-        params: tuple = ()
+        sql = "SELECT DISTINCT spans.trace_rowid FROM spans"
+        params: list = []
+        if self._project_name is not None:
+            sql += (
+                " JOIN traces ON spans.trace_rowid = traces.id"
+                " JOIN projects ON traces.project_rowid = projects.id"
+            )
+        sql += " WHERE spans.name = 'generate'"
+        if self._project_name is not None:
+            sql += " AND projects.name = ?"
+            params.append(self._project_name)
         if since is not None:
-            sql += " AND datetime(start_time) >= datetime(?)"
-            params = (since.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),)
-        return [row[0] for row in conn.execute(sql, params).fetchall()]
+            sql += " AND datetime(spans.start_time) >= datetime(?)"
+            params.append(since.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"))
+        return [row[0] for row in conn.execute(sql, tuple(params)).fetchall()]
 
     def _extract_sample(self, conn: sqlite3.Connection, trace_rowid: int) -> EvalSample | None:
         cur = conn.execute(

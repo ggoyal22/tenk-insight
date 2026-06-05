@@ -57,7 +57,7 @@ def _mock_conn(trace_ids: list[int], spans_by_trace: dict[int, list[tuple[str, s
 
     def execute(sql, params=()):
         cur = MagicMock()
-        if "DISTINCT trace_rowid" in sql:
+        if "DISTINCT spans.trace_rowid" in sql:
             cur.fetchall.return_value = [(tid,) for tid in trace_ids]
         else:
             tid = params[0]

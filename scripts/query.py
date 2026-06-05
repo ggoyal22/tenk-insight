@@ -58,7 +58,7 @@ def main() -> None:
     logger = logging.getLogger(__name__)
 
     try:
-        setup_tracing(config.tracing)
+        setup_tracing(config.tracing, project_name=f"cli-{config.environment}")
     except RuntimeError as exc:
         logger.critical("Failed to initialise tracing: %s", exc)
         sys.exit(1)

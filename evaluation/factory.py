@@ -22,9 +22,11 @@ from evaluation.extractors.base import BaseExtractor
 from evaluation.extractors.phoenix import PhoenixExtractor
 
 
-def build_extractor(config: EvaluationConfig) -> BaseExtractor:
+def build_extractor(
+    config: EvaluationConfig, project_name: str | None = None
+) -> BaseExtractor:
     if config.extractor.backend == "phoenix":
-        return PhoenixExtractor(_get_phoenix_db_path())
+        return PhoenixExtractor(_get_phoenix_db_path(), project_name=project_name)
     raise ValueError(f"Unknown extractor backend: '{config.extractor.backend}'")
 
 
