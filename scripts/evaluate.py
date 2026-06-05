@@ -1,15 +1,17 @@
 """
 Evaluation entry point for the SEC 10-K RAG pipeline.
 
-Two modes:
+Modes:
   * default     — run the generation pipeline over the golden queries, capturing
                   traces in Phoenix, then score those traces with RAGAS.
   * --eval-only — skip generation and score traces already present in Phoenix.
+  * --no-eval   — run generation and print a Q&A table; skip RAGAS scoring entirely.
 
 Examples:
     python scripts/evaluate.py
     python scripts/evaluate.py --difficulty easy
     python scripts/evaluate.py --eval-only --since 2h
+    python scripts/evaluate.py --no-eval
 """
 
 import argparse
@@ -18,6 +20,7 @@ import os
 import re
 import sqlite3
 import sys
+import textwrap
 import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -37,10 +40,11 @@ from evaluation.types import RunResult
 
 def _load_queries(
     golden_path: str | None, datasets: list[str], difficulty: str | None = None
-) -> list[str]:
-    """Load query strings from the golden file(s), filtered to the configured datasets.
+) -> list[tuple[str, str, str]]:
+    """Load queries from the golden file(s) as (query, query_type, difficulty) tuples.
 
-    When difficulty is given, only entries with a matching difficulty are kept.
+    Filtered to the configured datasets. When difficulty is given, only entries
+    with a matching difficulty are kept.
     """
     if not golden_path:
         return []
@@ -49,12 +53,12 @@ def _load_queries(
         return []
     files = [p] if p.is_file() else sorted(p.glob("*.yaml"))
     dataset_set = set(datasets)
-    queries: list[str] = []
+    queries: list[tuple[str, str, str]] = []
     for f in files:
         with open(f) as fh:
             entries = yaml.safe_load(fh) or []
         queries.extend(
-            str(e["query"]).strip()
+            (str(e["query"]).strip(), e["query_type"], e.get("difficulty") or "")
             for e in entries
             if isinstance(e, dict)
             and e.get("query_type") in dataset_set
@@ -85,6 +89,31 @@ def _print_summary(result: RunResult) -> None:
         )
         print(row)
     print()
+
+
+def _print_results(results: list[tuple[str, str, str, str]]) -> None:
+    """Print a Q&A table for all generation results.
+
+    Each entry is (query, query_type, difficulty, answer). Failed queries carry
+    a sentinel answer string (e.g. '[ERROR — see logs]').
+    """
+    sep = "━" * 80
+    print(f"\n{sep}")
+    print(" Query Results")
+    print(f"{sep}\n")
+    total = len(results)
+    for i, (query, query_type, difficulty, answer) in enumerate(results, 1):
+        tag = f"[{query_type} | {difficulty}]" if difficulty else f"[{query_type}]"
+        print(f" [{i}/{total}] {tag}")
+        q_wrapped = textwrap.fill(
+            query, width=100, initial_indent="  Q: ", subsequent_indent="     "
+        )
+        a_wrapped = textwrap.fill(
+            answer, width=100, initial_indent="  A: ", subsequent_indent="     "
+        )
+        print(q_wrapped)
+        print(a_wrapped)
+        print()
 
 
 def _parse_since(value: str) -> datetime:
@@ -151,6 +180,8 @@ def main() -> None:
             "examples:\n"
             "  python scripts/evaluate.py                    # generate answers, then score them\n"
             "  python scripts/evaluate.py --difficulty easy  # only the easy golden queries\n"
+            "  python scripts/evaluate.py --no-eval          # generate and print Q&A, skip RAGAS\n"
+            "  python scripts/evaluate.py --print-answers    # generate, print Q&A, then score\n"
             "  python scripts/evaluate.py --eval-only        # score existing traces in Phoenix\n"
             "  python scripts/evaluate.py --eval-only --since 2h\n"
         ),
@@ -159,6 +190,14 @@ def main() -> None:
     parser.add_argument(
         "-e", "--eval-only", action="store_true",
         help="Skip generation and evaluate existing traces in Phoenix",
+    )
+    parser.add_argument(
+        "-n", "--no-eval", action="store_true",
+        help="Run generation and print a Q&A table; skip RAGAS scoring entirely",
+    )
+    parser.add_argument(
+        "-a", "--print-answers", action="store_true",
+        help="Print a Q&A table after generation, then continue to RAGAS scoring",
     )
     parser.add_argument(
         "-s", "--since", metavar="DURATION",
@@ -180,6 +219,13 @@ def main() -> None:
              "(omit to score all projects).",
     )
     args = parser.parse_args()
+
+    if args.no_eval and args.eval_only:
+        sys.stderr.write("ERROR — --no-eval and --eval-only are mutually exclusive.\n")
+        sys.exit(1)
+    if args.print_answers and args.eval_only:
+        sys.stderr.write("ERROR — --print-answers and --eval-only are mutually exclusive (no generation to print).\n")
+        sys.exit(1)
 
     try:
         app_config = load_config()
@@ -221,6 +267,7 @@ def main() -> None:
         logger.info("Phoenix project: %s", eval_project)
 
     since: datetime | None
+    qa_results: list[tuple[str, str, str, str]] = []
 
     if args.eval_only:
         if args.difficulty:
@@ -269,12 +316,19 @@ def main() -> None:
                 "Executing %d queries across datasets %s", len(queries), eval_config.datasets
             )
 
-            for i, query in enumerate(queries, 1):
+            for i, (query, query_type, difficulty) in enumerate(queries, 1):
                 logger.info("[%d/%d] %s", i, len(queries), query)
                 try:
-                    graph.invoke(make_initial_state(query))
+                    state = graph.invoke(make_initial_state(query))
+                    answer = (
+                        state["answer"].answer
+                        if state.get("answer")
+                        else "[NO ANSWER]"
+                    )
                 except Exception:
                     logger.warning("Query failed, skipping: %s", query, exc_info=True)
+                    answer = "[ERROR — see logs]"
+                qa_results.append((query, query_type, difficulty, answer))
 
         except Exception:
             logger.critical("Execution phase failed", exc_info=True)
@@ -285,6 +339,11 @@ def main() -> None:
         from tracing.setup import flush_spans
 
         flush_spans()
+
+        if args.no_eval:
+            _print_results(qa_results)
+            return
+
         _wait_for_traces(os.environ.get("PHOENIX_DB_PATH", ""), since)
 
     logger.info("Loading evaluation libraries (RAGAS)...")
@@ -305,6 +364,9 @@ def main() -> None:
     except Exception:
         logger.critical("Evaluation phase failed", exc_info=True)
         sys.exit(1)
+
+    if args.print_answers and qa_results:
+        _print_results(qa_results)
 
     _print_summary(result)
 
