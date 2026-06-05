@@ -197,6 +197,7 @@ class RagasEvaluator(BaseEvaluator):
                 api_key=api_key,
                 http_client=httpx.AsyncClient(
                     limits=httpx.Limits(max_connections=20, max_keepalive_connections=20),
+                    timeout=httpx.Timeout(120.0),
                 ),
             )
             return llm_factory(cfg.model, provider="openai", client=self._openai_client, max_tokens=cfg.max_tokens)
