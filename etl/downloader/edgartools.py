@@ -44,7 +44,9 @@ class EdgarToolsDownloader(Downloader):
 
         matches = [
             f for f in all_filings
-            if f.period_of_report and int(f.period_of_report[:4]) == year
+            if f.period_of_report
+            and int(f.period_of_report[:4]) == year
+            and f.form == form_type
         ]
 
         if not matches:
@@ -52,7 +54,6 @@ class EdgarToolsDownloader(Downloader):
                 f"No {form_type} filing found for {ticker} with fiscal year {year}."
             )
 
-        # take the most recent filing date in case of amendments
         filing = max(matches, key=lambda f: f.filing_date)
 
         raw_html = filing.html()
