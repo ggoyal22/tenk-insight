@@ -473,3 +473,111 @@
       query: ExxonMobil regulatory and operational risk disclosure fiscal year 2025
   answer: |
     Boeing's fiscal year 2025 annual report disclosed a specific product-safety event and a resulting regulatory production constraint: following the 737-9 door plug accident in January 2024, the FAA investigated the 737 quality control system (including Spirit AeroSystems) and increased oversight, and the 737 program may only increase production rates and/or implement new production lines with the concurrence of the FAA. Boeing stated it slowed 737 production rates and delayed planned rate increases to reduce traveled work. ExxonMobil's fiscal year 2025 annual report did not disclose any such company-specific product-safety accident or a regulator-imposed cap on its output; instead it framed regulatory and technology matters as general industry and policy risks (for example, around emissions, lower-emission technologies such as carbon capture and storage, and shifting policy stringency).
+- query: What was NVIDIA's gross margin in fiscal year 2025, and how did it compare to fiscal
+    year 2024?
+  query_type: comparison
+  difficulty: medium
+  expected_tasks:
+  - filter:
+      ticker: NVDA
+      form_type: 10-K
+      fiscal_year: '2025'
+      section: '7'
+      query: What was NVIDIA's gross margin percentage in fiscal year 2025 and what drove
+        the year-over-year change?
+  answer: |
+    NVIDIA's gross margin was 75.0% in fiscal year 2025, up from 72.7% in fiscal year 2024. The year-over-year increase was primarily driven by a higher mix of Data Center revenue.
+- query: What was the operating income for NVIDIA's Compute & Networking segment in fiscal
+    year 2024, and how did it compare to fiscal year 2023?
+  query_type: comparison
+  difficulty: medium
+  expected_tasks:
+  - filter:
+      ticker: NVDA
+      form_type: 10-K
+      fiscal_year: '2024'
+      section: '7'
+      query: What was the operating income for NVIDIA's Compute and Networking segment in
+        fiscal year 2024 versus fiscal year 2023?
+  answer: |
+    NVIDIA's Compute & Networking segment operating income was $32,016 million in fiscal year 2024, up 530% from $5,083 million in fiscal year 2023.
+- query: What was Boeing's gain on dispositions, net, in 2025, and how did it compare to 2024?
+  query_type: comparison
+  difficulty: medium
+  expected_tasks:
+  - filter:
+      ticker: BA
+      form_type: 10-K
+      fiscal_year: '2025'
+      section: '8'
+      query: What was Boeing's gain on dispositions net in 2025 and 2024?
+  answer: |
+    Boeing's gain on dispositions, net was $9,672 million in 2025, compared to $46 million in 2024.
+- query: What was Boeing Commercial Airplanes' total backlog at December 31, 2025, and how
+    did it change from December 31, 2024?
+  query_type: comparison
+  difficulty: medium
+  expected_tasks:
+  - filter:
+      ticker: BA
+      form_type: 10-K
+      fiscal_year: '2025'
+      section: '7'
+      query: What was Boeing Commercial Airplanes' total backlog at December 31, 2025 and
+        how did it change from the prior year-end including order cancellations?
+  answer: |
+    BCA's total backlog was $567,290 million at December 31, 2025, up from $435,175 million at December 31, 2024, reflecting new orders in excess of deliveries. Aircraft order cancellations during 2025 totaled $11,094 million, primarily related to 777X, 737, and 787 aircraft.
+- query: What royalty income did AMD recognize from the THATIC joint venture in 2024 and 2023,
+    and what is the basis for these royalties?
+  query_type: comparison
+  difficulty: medium
+  expected_tasks:
+  - filter:
+      ticker: AMD
+      form_type: 10-K
+      fiscal_year: '2024'
+      section: '8'
+      query: What royalty income did AMD recognize from the THATIC joint venture in 2024 and
+        2023 and what intellectual property arrangement underlies these royalties?
+  answer: |
+    AMD recognized $48 million in royalty income from the THATIC joint venture in 2024 and $34 million in 2023. These royalties are based on sales of the THATIC JV's products developed using intellectual property that AMD licensed to the joint venture in February 2016.
+- query: What was ExxonMobil's regular employee count at year-end 2025, 2024, and 2023?
+  query_type: comparison
+  difficulty: medium
+  expected_tasks:
+  - filter:
+      ticker: XOM
+      form_type: 10-K
+      fiscal_year: '2025'
+      section: '1'
+      query: What was ExxonMobil's regular employee headcount at year-end 2025, 2024, and
+        2023?
+  answer: |
+    ExxonMobil's regular employee count was 58 thousand at year-end 2025, 61 thousand at year-end 2024, and 62 thousand at year-end 2023.
+- query: What were AMD's Client segment net revenue, unit shipment growth, average selling
+    price change, and operating income in 2024 compared to 2023?
+  query_type: comparison
+  difficulty: hard
+  expected_tasks:
+  - filter:
+      ticker: AMD
+      form_type: 10-K
+      fiscal_year: '2024'
+      section: '7'
+      query: What were AMD's Client segment revenue, unit shipments, average selling price,
+        and operating income in 2024 versus 2023?
+  answer: |
+    AMD's Client segment net revenue was $7.1 billion in 2024, up 52% from $4.7 billion in 2023, primarily due to a 34% increase in unit shipments and a 13% increase in average selling price driven by strong demand for AMD mobile and desktop Ryzen processors. Client operating income was $897 million in 2024, compared to an operating loss of $46 million in 2023.
+- query: How many commercial aircraft did Boeing Commercial Airplanes deliver by model type
+    in fiscal year 2025, and how did the total compare to fiscal year 2024 deliveries?
+  query_type: comparison
+  difficulty: hard
+  answer: |
+    Boeing Commercial Airplanes delivered 600 total aircraft in fiscal year 2025 (including intercompany deliveries): 447 of the 737 (of which 7 were intercompany), 30 of the 767 (of which 15 were intercompany), 35 of the 777, and 88 of the 787. No 747 aircraft were delivered. This compares to 348 total deliveries in fiscal year 2024: 265 of the 737, 18 of the 767, 14 of the 777, and 51 of the 787.
+- query: What were the primary drivers of the increase in revenue for each of Boeing's three
+    reportable segments in fiscal year 2025 compared to fiscal year 2024, and what was the
+    total revenue increase across all segments?
+  query_type: comparison
+  difficulty: hard
+  answer: |
+    Boeing's total revenues increased by $22,946 million in fiscal year 2025 compared with 2024. BCA revenues increased by $18,633 million, primarily due to higher deliveries. BDS revenues increased by $3,316 million, primarily due to lower net unfavorable cumulative contract catch-up adjustments and higher volume. BGS revenues increased by $969 million, primarily due to higher government and commercial services revenue.

@@ -146,20 +146,6 @@
         2025
   answer: |
     There were 276,536 registered shareholders of ExxonMobil common stock at December 31, 2025.
-- query: What was NVIDIA's gross margin in fiscal year 2025, and how did it compare to fiscal
-    year 2024?
-  query_type: single
-  difficulty: medium
-  expected_tasks:
-  - filter:
-      ticker: NVDA
-      form_type: 10-K
-      fiscal_year: '2025'
-      section: '7'
-      query: What was NVIDIA's gross margin percentage in fiscal year 2025 and what drove
-        the year-over-year change?
-  answer: |
-    NVIDIA's gross margin was 75.0% in fiscal year 2025, up from 72.7% in fiscal year 2024. The year-over-year increase was primarily driven by a higher mix of Data Center revenue.
 - query: What was NVIDIA's total operating income in fiscal year 2025, and what was the year-over-year
     change?
   query_type: single
@@ -174,20 +160,6 @@
         from the prior year?
   answer: |
     NVIDIA's total operating income was $81,453 million in fiscal year 2025, up 147% from $32,972 million in fiscal year 2024.
-- query: What was the operating income for NVIDIA's Compute & Networking segment in fiscal
-    year 2024, and how did it compare to fiscal year 2023?
-  query_type: single
-  difficulty: medium
-  expected_tasks:
-  - filter:
-      ticker: NVDA
-      form_type: 10-K
-      fiscal_year: '2024'
-      section: '7'
-      query: What was the operating income for NVIDIA's Compute and Networking segment in
-        fiscal year 2024 versus fiscal year 2023?
-  answer: |
-    NVIDIA's Compute & Networking segment operating income was $32,016 million in fiscal year 2024, up 530% from $5,083 million in fiscal year 2023.
 - query: What were AMD's Embedded segment net revenue and operating income in 2024, and what
     drove the year-over-year changes?
   query_type: single
@@ -304,32 +276,6 @@
         agreements caused the increase from 2024?
   answer: |
     Pfizer's acquired in-process research and development expense was $1,613 million in 2025, up from $108 million in 2024. The increase was primarily driven by a $1.35 billion charge related to an in-licensing agreement with 3SBio and a $150 million charge related to an in-licensing agreement with YaoPharma.
-- query: What was Boeing's gain on dispositions, net, in 2025, and how did it compare to 2024?
-  query_type: single
-  difficulty: medium
-  expected_tasks:
-  - filter:
-      ticker: BA
-      form_type: 10-K
-      fiscal_year: '2025'
-      section: '8'
-      query: What was Boeing's gain on dispositions net in 2025 and 2024?
-  answer: |
-    Boeing's gain on dispositions, net was $9,672 million in 2025, compared to $46 million in 2024.
-- query: What was Boeing Commercial Airplanes' total backlog at December 31, 2025, and how
-    did it change from December 31, 2024?
-  query_type: single
-  difficulty: medium
-  expected_tasks:
-  - filter:
-      ticker: BA
-      form_type: 10-K
-      fiscal_year: '2025'
-      section: '7'
-      query: What was Boeing Commercial Airplanes' total backlog at December 31, 2025 and
-        how did it change from the prior year-end including order cancellations?
-  answer: |
-    BCA's total backlog was $567,290 million at December 31, 2025, up from $435,175 million at December 31, 2024, reflecting new orders in excess of deliveries. Aircraft order cancellations during 2025 totaled $11,094 million, primarily related to 777X, 737, and 787 aircraft.
 - query: What labor action affected Boeing's St. Louis area operations in 2025, and what was
     its duration and operational impact?
   query_type: single
@@ -344,33 +290,6 @@
         in 2025, how long did it last, and which programs were affected?
   answer: |
     In 2025, employees represented by IAM District 837, which represents approximately 3,200 employees at Boeing's St. Louis area sites, went on strike for 101 days. The strike disrupted Boeing's St. Louis operations and impacted programs including F/A-18, F-15, T-7A, MQ-25, and Weapons.
-- query: What royalty income did AMD recognize from the THATIC joint venture in 2024 and 2023,
-    and what is the basis for these royalties?
-  query_type: single
-  difficulty: medium
-  expected_tasks:
-  - filter:
-      ticker: AMD
-      form_type: 10-K
-      fiscal_year: '2024'
-      section: '8'
-      query: What royalty income did AMD recognize from the THATIC joint venture in 2024 and
-        2023 and what intellectual property arrangement underlies these royalties?
-  answer: |
-    AMD recognized $48 million in royalty income from the THATIC joint venture in 2024 and $34 million in 2023. These royalties are based on sales of the THATIC JV's products developed using intellectual property that AMD licensed to the joint venture in February 2016.
-- query: What was ExxonMobil's regular employee count at year-end 2025, 2024, and 2023?
-  query_type: single
-  difficulty: medium
-  expected_tasks:
-  - filter:
-      ticker: XOM
-      form_type: 10-K
-      fiscal_year: '2025'
-      section: '1'
-      query: What was ExxonMobil's regular employee headcount at year-end 2025, 2024, and
-        2023?
-  answer: |
-    ExxonMobil's regular employee count was 58 thousand at year-end 2025, 61 thousand at year-end 2024, and 62 thousand at year-end 2023.
 - query: What percentage of ExxonMobil's global employees are based outside the United States,
     and what is the average length of service for career employees?
   query_type: single
@@ -400,20 +319,6 @@
         revenue percentages for its largest direct and indirect customers?
   answer: |
     NVIDIA's largest direct customer, referred to as Customer A, represented 13% of total revenue for fiscal year 2024, attributable to the Compute & Networking segment. One indirect customer, which primarily purchases through system integrators and distributors including through Customer A, is estimated to have represented approximately 19% of total revenue for fiscal year 2024, also attributable to the Compute & Networking segment.
-- query: What were AMD's Client segment net revenue, unit shipment growth, average selling
-    price change, and operating income in 2024 compared to 2023?
-  query_type: single
-  difficulty: hard
-  expected_tasks:
-  - filter:
-      ticker: AMD
-      form_type: 10-K
-      fiscal_year: '2024'
-      section: '7'
-      query: What were AMD's Client segment revenue, unit shipments, average selling price,
-        and operating income in 2024 versus 2023?
-  answer: |
-    AMD's Client segment net revenue was $7.1 billion in 2024, up 52% from $4.7 billion in 2023, primarily due to a 34% increase in unit shipments and a 13% increase in average selling price driven by strong demand for AMD mobile and desktop Ryzen processors. Client operating income was $897 million in 2024, compared to an operating loss of $46 million in 2023.
 - query: What R&D co-funding arrangement did Pfizer enter into with Abingworth in September
     2025, and what were the key financial terms including the 2025 impact and potential milestone
     payment?
@@ -453,12 +358,6 @@
   difficulty: hard
   answer: |
     As of December 31, 2025, 158,290,410 shares were available for future issuance under Tesla equity compensation plans approved by security holders: 64,682,073 shares remaining available under the Tesla, Inc. Amended and Restated 2019 Equity Incentive Plan, and 93,608,337 shares remaining available under the Tesla, Inc. 2019 Employee Stock Purchase Plan.
-- query: How many commercial aircraft did Boeing Commercial Airplanes deliver by model type
-    in fiscal year 2025, and how did the total compare to fiscal year 2024 deliveries?
-  query_type: single
-  difficulty: hard
-  answer: |
-    Boeing Commercial Airplanes delivered 600 total aircraft in fiscal year 2025 (including intercompany deliveries): 447 of the 737 (of which 7 were intercompany), 30 of the 767 (of which 15 were intercompany), 35 of the 777, and 88 of the 787. No 747 aircraft were delivered. This compares to 348 total deliveries in fiscal year 2024: 265 of the 737, 18 of the 767, 14 of the 777, and 51 of the 787.
 - query: As of December 31, 2025, what were the three largest unions representing Boeing's
     workforce by percentage of total employees, and what was the expiration date of the IAM
     District 751 collective bargaining agreement covering Washington state manufacturing employees?
@@ -466,10 +365,3 @@
   difficulty: hard
   answer: |
     As of December 31, 2025, the three largest unions were: the International Association of Machinists and Aerospace Workers (IAM) at 25% of total workforce; the Society of Professional Engineering Employees in Aerospace (SPEEA) at 11%; and the United Automobile, Aerospace and Agricultural Implement Workers of America (UAW) at 1%. The IAM District 751 agreement covering Washington state expires in September 2028.
-- query: What were the primary drivers of the increase in revenue for each of Boeing's three
-    reportable segments in fiscal year 2025 compared to fiscal year 2024, and what was the
-    total revenue increase across all segments?
-  query_type: single
-  difficulty: hard
-  answer: |
-    Boeing's total revenues increased by $22,946 million in fiscal year 2025 compared with 2024. BCA revenues increased by $18,633 million, primarily due to higher deliveries. BDS revenues increased by $3,316 million, primarily due to lower net unfavorable cumulative contract catch-up adjustments and higher volume. BGS revenues increased by $969 million, primarily due to higher government and commercial services revenue.
