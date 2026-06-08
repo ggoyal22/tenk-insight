@@ -94,8 +94,8 @@ _EMBEDDINGS_REQUIRED: frozenset[str] = frozenset({"answer_relevancy", "answer_co
 _EMBEDDINGS_ONLY: frozenset[str] = frozenset({"semantic_similarity"})
 
 
-_BATCH_SIZE = 5          # samples per abatch_score call
-_INTER_BATCH_SLEEP = 10  # seconds between batches to stay within TPM limits
+_BATCH_SIZE = 2          # samples per abatch_score call
+_INTER_BATCH_SLEEP = 3   # seconds between batches to stay within TPM limits
 
 
 class RagasEvaluator(BaseEvaluator):
@@ -203,6 +203,9 @@ class RagasEvaluator(BaseEvaluator):
             api_key = cfg.api_key.get_secret_value() if cfg.api_key else None
             self._openai_client = AsyncOpenAI(
                 api_key=api_key,
+                # Default is 2; a saturated TPM window can outlast 2 short backoffs.
+                # 6 retries give ~30s of exponential backoff per call, honoring Retry-After.
+                max_retries=6,
                 http_client=httpx.AsyncClient(
                     limits=httpx.Limits(max_connections=20, max_keepalive_connections=20),
                     timeout=httpx.Timeout(120.0),
