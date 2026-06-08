@@ -336,13 +336,6 @@
         year 2024
   answer: |
     NVIDIA's fiscal year 2024 annual report disclosed specific products subject to U.S. government export licensing requirements, including A100 and H100 integrated circuits and DGX systems incorporating those chips (impacted from the third quarter of fiscal year 2023), and, effective in the fourth quarter of fiscal year 2024, A800, H800, L4, L40, L40S, and RTX 4090 for exports to China and Country Groups D1, D4, and D5 (including Saudi Arabia, the United Arab Emirates, and Vietnam, but excluding Israel). AMD's fiscal year 2024 annual report did not name specific data center GPU products subject to China-related export licensing requirements; instead AMD described export control as a general legal and regulatory risk that may limit its ability to export products to certain customers, and specifically noted that the Bureau of Industry and Security had added AMD's THATIC joint venture partners to the Entity List in June 2019.
-- query: What key production or energy output figure did Tesla's management highlight in the
-    fiscal year 2025 executive compensation discussion, and how many total commercial aircraft
-    did Boeing deliver in fiscal year 2025 compared to fiscal year 2024?
-  query_type: comparison
-  difficulty: hard
-  answer: |
-    In Tesla's fiscal year 2025 annual filing, management highlighted that Tesla deployed 46.7 gigawatt hours of energy storage in 2025, representing an increase of 48.7% compared to the prior year. In Boeing's fiscal year 2025 10-K, Boeing Commercial Airplanes delivered a total of 600 commercial aircraft (including intercompany deliveries), compared to 348 aircraft delivered in fiscal year 2024.
 - query: What total revenue did NVIDIA, Apple, and Microsoft each report for fiscal year 2025?
   query_type: comparison
   difficulty: hard
