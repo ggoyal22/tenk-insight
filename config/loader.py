@@ -134,12 +134,24 @@ class RerankingConfig(BaseModel):
     top_k: int = Field(gt=0, default=5)
 
 
+class SectionRetryConfig(BaseModel):
+    # When a section-filtered retrieval's top reranked result scores below min_top_score,
+    # retrieval runs again without the section filter and merges both result sets — the
+    # section was likely too narrow (companies file the same figure under different items).
+    # Requires reranking (the trigger is a reranker score); no-ops when reranking is off.
+    # min_top_score scale is reranker-specific — good matches run well above it for the
+    # default ms-marco model.
+    enabled: bool = True
+    min_top_score: float = 3.0
+
+
 class RetrievalConfig(BaseModel):
     metadata_filtering: MetadataFilteringConfig = Field(default_factory=MetadataFilteringConfig)
     vector_search: VectorSearchConfig = Field(default_factory=VectorSearchConfig)
     keyword_search: KeywordSearchConfig = Field(default_factory=KeywordSearchConfig)
     fusion: FusionConfig = Field(default_factory=FusionConfig)
     reranking: RerankingConfig = Field(default_factory=RerankingConfig)
+    section_retry: SectionRetryConfig = Field(default_factory=SectionRetryConfig)
     final_top_k: int = Field(gt=0, default=5)
 
     @model_validator(mode="after")

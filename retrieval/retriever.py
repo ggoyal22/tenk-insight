@@ -1,4 +1,5 @@
 import logging
+from dataclasses import replace
 from uuid import UUID
 
 from config.loader import RetrievalConfig
@@ -37,6 +38,79 @@ class Retriever:
         self._filings = filings_repo
 
     def retrieve(
+        self,
+        keyword_query: str,
+        semantic_embedding: list[float],
+        filters: MetadataFilter | None = None,
+        rerank_query: str | None = None,
+        exclude_parent_ids: list[UUID] | None = None,
+    ) -> list[RetrievalResult]:
+        results = self._search(
+            keyword_query, semantic_embedding, filters, rerank_query, exclude_parent_ids
+        )
+
+        # A section filter that even the best chunk can't clear (or that returns
+        # nothing) was likely too narrow to reach the answer — companies vary in
+        # which 10-K item holds a given figure. Search again without the section
+        # (ticker and fiscal year are kept) and merge both sets, letting the
+        # reranker arbitrate across them. Merging never discards a strong
+        # section-filtered result, so widening can only help.
+        if self._section_too_restrictive(filters, results):
+            widened = replace(filters, section=None)
+            relaxed = self._search(
+                keyword_query, semantic_embedding, widened, rerank_query, exclude_parent_ids
+            )
+            if relaxed:
+                results = self._merge(results, relaxed)
+
+        return results
+
+    def _merge(
+        self, primary: list[RetrievalResult], extra: list[RetrievalResult]
+    ) -> list[RetrievalResult]:
+        """Combine two reranked result sets into a single top-k ordered by reranker score.
+
+        Reranker scores are per-(query, chunk) independent, so taking the top-k by score
+        over the union of two already-top-k sets yields the true top-k over their union.
+        Deduplicates by chunk id, keeping the higher-scored occurrence.
+        """
+        best: dict[UUID, RetrievalResult] = {}
+        for r in (*primary, *extra):
+            current = best.get(r.chunk.id)
+            if current is None or (r.reranker_score or 0.0) > (current.reranker_score or 0.0):
+                best[r.chunk.id] = r
+        return sorted(
+            best.values(), key=lambda r: r.reranker_score or 0.0, reverse=True
+        )[: self._config.reranking.top_k]
+
+    def _section_too_restrictive(
+        self, filters: MetadataFilter | None, results: list[RetrievalResult]
+    ) -> bool:
+        """True when a section filter was applied but the results fail the relevance floor.
+
+        The floor is a reranker-score concept, so this only applies when reranking is
+        active. An empty result set counts as failing — it is the strongest signal the
+        section excluded the relevant content.
+        """
+        if not self._config.section_retry.enabled:
+            return False
+        if not (self._reranker and self._config.reranking.enabled):
+            return False
+
+        section = filters.section if filters else None
+        if section:
+            section = section.strip().rstrip(".")
+            if section.lower() == "null":
+                section = None
+        if not section:
+            return False
+
+        if not results:
+            return True
+        scores = [r.reranker_score for r in results if r.reranker_score is not None]
+        return bool(scores) and max(scores) < self._config.section_retry.min_top_score
+
+    def _search(
         self,
         keyword_query: str,
         semantic_embedding: list[float],

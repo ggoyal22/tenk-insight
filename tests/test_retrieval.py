@@ -6,12 +6,15 @@ from uuid import UUID, uuid4
 
 import pytest
 
-from config.loader import FusionConfig, KeywordSearchConfig, RetrievalConfig, RerankingConfig, VectorSearchConfig
+from config.loader import (
+    FusionConfig, KeywordSearchConfig, RetrievalConfig, RerankingConfig,
+    SectionRetryConfig, VectorSearchConfig,
+)
 from db.models import ChunkRecord, FilingRecord, ParentChunkRecord
 from retrieval.fusion.rrf import RRFFusion
 from retrieval.reranker.cross_encoder import CrossEncoderReranker
 from retrieval.retriever import Retriever
-from retrieval.types import MetadataFilter
+from retrieval.types import MetadataFilter, RetrievalResult
 
 
 def _ids(*n: int) -> list[UUID]:
@@ -299,3 +302,78 @@ class TestCrossEncoderReranker:
         MockCE.return_value = MagicMock()
         reranker = CrossEncoderReranker("mock-model")
         assert reranker.rerank("query", []) == []
+
+
+def _result(reranker_score: float) -> RetrievalResult:
+    fid, pid, cid = uuid4(), uuid4(), uuid4()
+    return RetrievalResult(
+        score=0.0, vector_score=None, keyword_score=None, reranker_score=reranker_score,
+        chunk=_chunk_record(cid, fid, pid),
+        parent_chunk=_parent_record(pid, fid),
+        filing=_filing_record(fid),
+    )
+
+
+class TestSectionRetry:
+    """Retrieval widens an over-narrow section filter by re-searching without it and merging."""
+
+    def _retriever(self, *, enabled: bool = True, min_top_score: float = 3.0) -> Retriever:
+        config = RetrievalConfig(
+            vector_search=VectorSearchConfig(enabled=True, oversample_k=5, similarity_threshold=0.0),
+            keyword_search=KeywordSearchConfig(enabled=False),
+            fusion=FusionConfig(top_k=5),
+            reranking=RerankingConfig(enabled=True, top_k=5),
+            section_retry=SectionRetryConfig(enabled=enabled, min_top_score=min_top_score),
+            final_top_k=5,
+        )
+        return Retriever(
+            config=config, fusion=RRFFusion(),
+            chunks_repo=MagicMock(), parent_chunks_repo=MagicMock(), filings_repo=MagicMock(),
+            vector_retriever=MagicMock(), keyword_retriever=None,
+            reranker=MagicMock(),
+        )
+
+    def test_widens_and_merges_when_top_below_floor(self):
+        r = self._retriever()
+        low, high = _result(1.0), _result(5.0)
+        with patch.object(r, "_search", side_effect=[[low], [high]]) as m:
+            results = r.retrieve(
+                keyword_query="x", semantic_embedding=[0.1] * 8,
+                filters=MetadataFilter(section="Item 1"),
+            )
+        assert m.call_count == 2
+        assert m.call_args_list[1].args[2].section is None  # second search drops the section
+        assert [x.reranker_score for x in results] == [5.0, 1.0]  # merged, ordered by score
+
+    def test_no_widen_when_top_meets_floor(self):
+        r = self._retriever()
+        good = _result(4.0)
+        with patch.object(r, "_search", side_effect=[[good]]) as m:
+            results = r.retrieve(
+                keyword_query="x", semantic_embedding=[0.1] * 8,
+                filters=MetadataFilter(section="Item 1"),
+            )
+        assert m.call_count == 1
+        assert results == [good]
+
+    def test_disabled_never_widens(self):
+        r = self._retriever(enabled=False)
+        low = _result(1.0)
+        with patch.object(r, "_search", side_effect=[[low]]) as m:
+            results = r.retrieve(
+                keyword_query="x", semantic_embedding=[0.1] * 8,
+                filters=MetadataFilter(section="Item 1"),
+            )
+        assert m.call_count == 1
+        assert results == [low]
+
+    def test_no_widen_without_section_filter(self):
+        r = self._retriever()
+        low = _result(1.0)  # below floor, but no section to relax
+        with patch.object(r, "_search", side_effect=[[low]]) as m:
+            results = r.retrieve(
+                keyword_query="x", semantic_embedding=[0.1] * 8,
+                filters=MetadataFilter(ticker="NVDA"),
+            )
+        assert m.call_count == 1
+        assert results == [low]

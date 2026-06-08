@@ -80,6 +80,11 @@ retrieval:
     model: "cross-encoder/ms-marco-MiniLM-L-6-v2"
     top_k: 5                     # final results returned to the LLM (only used when reranking.enabled: true)
 
+  section_retry:                 # widen an over-narrow section filter by re-searching without it
+    enabled: true                # set false to disable; requires reranking.enabled
+    min_top_score: 3.0           # if the top reranked result scores below this, also search without
+                                 # the section filter and merge (reranker-specific scale)
+
   final_top_k: 5                 # used when reranking is disabled
 
 
