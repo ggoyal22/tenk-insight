@@ -90,9 +90,10 @@ class PostgresChunksRepository(ChunksRepo, PostgresRepository[ChunkRecord]):
         top_k: int,
         filing_ids: list[UUID] | None = None,
         section: str | None = None,
+        exclude_parent_ids: list[UUID] | None = None,
         query_mode: str = "web",
     ) -> list[tuple[UUID, float]]:
-        results = self._fts_query(query, top_k, filing_ids, section, query_mode)
+        results = self._fts_query(query, top_k, filing_ids, section, exclude_parent_ids, query_mode)
         if results:
             return results
 
@@ -100,7 +101,7 @@ class PostgresChunksRepository(ChunksRepo, PostgresRepository[ChunkRecord]):
         terms = query.split()
         if len(terms) > self._FALLBACK_TERMS:
             fallback_query = " ".join(terms[:self._FALLBACK_TERMS])
-            results = self._fts_query(fallback_query, top_k, filing_ids, section, query_mode)
+            results = self._fts_query(fallback_query, top_k, filing_ids, section, exclude_parent_ids, query_mode)
 
         return results
 
@@ -110,6 +111,7 @@ class PostgresChunksRepository(ChunksRepo, PostgresRepository[ChunkRecord]):
         top_k: int,
         filing_ids: list[UUID] | None,
         section: str | None,
+        exclude_parent_ids: list[UUID] | None,
         query_mode: str,
     ) -> list[tuple[UUID, float]]:
         query_fn = self._QUERY_FN.get(query_mode, "websearch_to_tsquery")
@@ -127,6 +129,10 @@ class PostgresChunksRepository(ChunksRepo, PostgresRepository[ChunkRecord]):
         if section is not None:
             where_parts.append("section = %s")
             params.append(section)
+
+        if exclude_parent_ids:
+            where_parts.append("parent_chunk_id <> ALL(%s::uuid[])")
+            params.append([str(pid) for pid in exclude_parent_ids])
 
         where = " AND ".join(where_parts)
         # query appears twice: once in WHERE tsquery and once for ts_rank scoring

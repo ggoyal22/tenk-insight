@@ -42,6 +42,7 @@ class Retriever:
         semantic_embedding: list[float],
         filters: MetadataFilter | None = None,
         rerank_query: str | None = None,
+        exclude_parent_ids: list[UUID] | None = None,
     ) -> list[RetrievalResult]:
         filing_ids = self._resolve_filing_ids(filters)
         raw_section = filters.section if filters else None
@@ -59,6 +60,7 @@ class Retriever:
                 top_k=self._config.vector_search.oversample_k,
                 filing_ids=filing_ids,
                 section=section,
+                exclude_parent_ids=exclude_parent_ids,
             )
             if vector_results:
                 vector_scores = {cid: s for cid, s in vector_results}
@@ -70,6 +72,7 @@ class Retriever:
                 top_k=self._config.keyword_search.top_k,
                 filing_ids=filing_ids,
                 section=section,
+                exclude_parent_ids=exclude_parent_ids,
             )
             if keyword_results:
                 keyword_scores = {cid: s for cid, s in keyword_results}

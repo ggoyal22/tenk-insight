@@ -78,6 +78,7 @@ class PgvectorStore(VectorStore):
         top_k: int,
         filing_ids: list[UUID] | None = None,
         section: str | None = None,
+        exclude_parent_ids: list[UUID] | None = None,
         include_embedding: bool = False,
     ) -> list[SearchResult]:
         op = self._operator
@@ -96,6 +97,10 @@ class PgvectorStore(VectorStore):
         if section is not None:
             where_parts.append("section = %s")
             where_params.append(section)
+
+        if exclude_parent_ids:
+            where_parts.append("parent_chunk_id <> ALL(%s::uuid[])")
+            where_params.append([str(pid) for pid in exclude_parent_ids])
 
         where = " AND ".join(where_parts)
 

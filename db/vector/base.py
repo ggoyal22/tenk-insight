@@ -22,11 +22,14 @@ class VectorStore(ABC):
         top_k: int,
         filing_ids: list[UUID] | None = None,
         section: str | None = None,
+        exclude_parent_ids: list[UUID] | None = None,
         include_embedding: bool = False,
     ) -> list[SearchResult]:
         """Return top-k results by vector similarity.
 
         filing_ids and section are optional pre-filters applied before ranking.
+        exclude_parent_ids drops chunks belonging to those parent chunks before
+        ranking; pass None or an empty list to skip.
         When include_embedding=True, each SearchResult carries the full float32
         embedding for downstream exact rescoring.
         """

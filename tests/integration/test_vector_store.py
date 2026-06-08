@@ -99,6 +99,23 @@ class TestPgvectorStore:
         results = vector_store.search(query_vector=embedding, top_k=3)
         assert len(results) <= 3
 
+    def test_search_excludes_parent_ids(self, vector_store, db_client):
+        filing_id = create_filings_repo(db_client).insert(_filing())
+        parents_repo = create_parent_chunks_repo(db_client)
+        chunks_repo = create_chunks_repo(db_client)
+        parent_a = parents_repo.insert(_parent_chunk(filing_id, chunk_index=0))
+        parent_b = parents_repo.insert(_parent_chunk(filing_id, chunk_index=1))
+        chunk_a = chunks_repo.insert(_chunk(filing_id, parent_a, chunk_index=0))
+        chunk_b = chunks_repo.insert(_chunk(filing_id, parent_b, chunk_index=1))
+        embedding = [0.1] * 1024
+        vector_store.upsert(chunk_a, embedding, {"embedding_model": "BAAI/bge-large-en-v1.5"})
+        vector_store.upsert(chunk_b, embedding, {"embedding_model": "BAAI/bge-large-en-v1.5"})
+
+        results = vector_store.search(query_vector=embedding, top_k=5, exclude_parent_ids=[parent_a])
+        returned = {r.chunk_id for r in results}
+        assert chunk_a not in returned
+        assert chunk_b in returned
+
     def test_delete_embedding_clears_embedding(self, vector_store, db_client, chunk_id):
         embedding = [0.1] * 1024
         vector_store.upsert(chunk_id, embedding, {"embedding_model": "BAAI/bge-large-en-v1.5"})

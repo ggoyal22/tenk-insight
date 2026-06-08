@@ -171,6 +171,23 @@ class TestKeywordSearch:
             scores = [s for _, s in results]
             assert scores == sorted(scores, reverse=True)
 
+    def test_exclude_parent_ids(self, db_client):
+        filings_repo = create_filings_repo(db_client)
+        parents_repo = create_parent_chunks_repo(db_client)
+        chunks_repo = create_chunks_repo(db_client)
+
+        filing_id = filings_repo.insert(_filing())
+        parent_a = parents_repo.insert(_parent_chunk(filing_id, chunk_index=0))
+        parent_b = parents_repo.insert(_parent_chunk(filing_id, chunk_index=1))
+        chunks_repo.insert(_chunk(filing_id, parent_a, chunk_index=0, text="NVIDIA GPU supply chain risk."))
+        chunks_repo.insert(_chunk(filing_id, parent_b, chunk_index=1, text="NVIDIA GPU supply chain shortage."))
+
+        results = chunks_repo.keyword_search("GPU supply chain", top_k=10, exclude_parent_ids=[parent_a])
+        chunks = chunks_repo.get_by_ids([r[0] for r in results])
+        assert chunks
+        assert all(c.parent_chunk_id != parent_a for c in chunks)
+        assert any(c.parent_chunk_id == parent_b for c in chunks)
+
 
 # ── Retriever end-to-end ──────────────────────────────────────────────────────
 
@@ -251,6 +268,33 @@ class TestRetrieverEndToEnd:
         assert len(results) >= 1
         assert all(r.filing.ticker == "NVDA" for r in results)
         assert all(r.chunk.id != amd_chunk_id for r in results)
+
+    def test_retrieve_excludes_seen_parents(self, db_client):
+        retriever, filings_repo, parents_repo, chunks_repo, vector_store = _make_retriever(db_client)
+
+        filing_id = filings_repo.insert(_filing())
+        parent_a = parents_repo.insert(_parent_chunk(filing_id, chunk_index=0))
+        parent_b = parents_repo.insert(_parent_chunk(filing_id, chunk_index=1))
+        chunk_a = chunks_repo.insert(_chunk(filing_id, parent_a, chunk_index=0, text="NVIDIA GPU supply chain risk."))
+        chunk_b = chunks_repo.insert(_chunk(filing_id, parent_b, chunk_index=1, text="NVIDIA GPU supply chain shortage."))
+        embedding = [0.1] * 1024
+        vector_store.upsert(chunk_a, embedding, {"embedding_model": "test-model"})
+        vector_store.upsert(chunk_b, embedding, {"embedding_model": "test-model"})
+
+        # Baseline — both parents are retrievable.
+        baseline = retriever.retrieve(keyword_query="GPU supply chain", semantic_embedding=embedding)
+        assert {parent_a, parent_b} <= {r.parent_chunk.id for r in baseline}
+
+        # Excluding parent_a must drop it from both the vector and keyword legs.
+        results = retriever.retrieve(
+            keyword_query="GPU supply chain",
+            semantic_embedding=embedding,
+            exclude_parent_ids=[parent_a],
+        )
+        assert results
+        assert all(r.parent_chunk.id != parent_a for r in results)
+        assert any(r.parent_chunk.id == parent_b for r in results)
+        assert chunk_a not in {r.chunk.id for r in results}
 
     def test_retrieve_on_empty_db_returns_empty(self, db_client):
         retriever, *_ = _make_retriever(db_client)

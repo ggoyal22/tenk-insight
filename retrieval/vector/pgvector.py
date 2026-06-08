@@ -30,12 +30,14 @@ class PgvectorRetriever(BaseVectorRetriever):
         top_k: int,
         filing_ids: list[UUID] | None = None,
         section: str | None = None,
+        exclude_parent_ids: list[UUID] | None = None,
     ) -> list[tuple[UUID, float]]:
         candidates = self._store.search(
             query_vector=query_embedding,
             top_k=self._oversample_k,
             filing_ids=filing_ids,
             section=section,
+            exclude_parent_ids=exclude_parent_ids,
             include_embedding=True,
         )
 

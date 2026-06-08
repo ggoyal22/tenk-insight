@@ -2,6 +2,7 @@ import operator
 from dataclasses import dataclass
 from datetime import date
 from typing import Annotated, Literal, NotRequired, TypedDict
+from uuid import UUID
 
 from pydantic import BaseModel, Field
 
@@ -33,6 +34,9 @@ class RetrievalTask(BaseModel):
     hyde_query: str | None = Field(default=None, max_length=_MAX_HYDE_QUERY)
     # Pre-computed by embed_queries node; excluded from serialisation (large + internal).
     query_embedding: list[float] | None = Field(default=None, exclude=True)
+    # Parent-chunk IDs already retrieved by earlier hops; a follow-up hop excludes
+    # them so it surfaces new context instead of re-fetching chunks already seen.
+    exclude_parent_ids: list[UUID] = Field(default_factory=list, exclude=True)
 
 
 class QueryPlan(BaseModel):

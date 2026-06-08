@@ -34,10 +34,13 @@ class ChunksRepo(RelationalRepository[ChunkRecord]):
         top_k: int,
         filing_ids: list[UUID] | None = None,
         section: str | None = None,
+        exclude_parent_ids: list[UUID] | None = None,
     ) -> list[tuple[UUID, float]]:
         """Full-text search over chunk text using tsvector/tsquery.
 
         Returns (chunk_id, ts_rank score) pairs ordered by relevance descending.
         filing_ids and section are optional pre-filters applied before ranking.
+        exclude_parent_ids drops chunks belonging to those parent chunks before
+        ranking; pass None or an empty list to skip.
         """
         ...

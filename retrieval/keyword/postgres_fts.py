@@ -18,12 +18,14 @@ class PostgresFTSRetriever(BaseKeywordRetriever):
         top_k: int,
         filing_ids: list[UUID] | None = None,
         section: str | None = None,
+        exclude_parent_ids: list[UUID] | None = None,
     ) -> list[tuple[UUID, float]]:
         results = self._repo.keyword_search(
             query=query,
             top_k=top_k,
             filing_ids=filing_ids,
             section=section,
+            exclude_parent_ids=exclude_parent_ids,
             query_mode=self._query_mode,
         )
 

@@ -42,6 +42,7 @@ def make_retrieve(retriever: Retriever, embedder: Embedder) -> Callable[[Retriev
                 semantic_embedding=semantic_embedding,
                 rerank_query=task.semantic_query,
                 filters=task.filter,
+                exclude_parent_ids=task.exclude_parent_ids,
             )
         except Exception:
             # Best-effort: a single task's failure must not abort the whole query.
