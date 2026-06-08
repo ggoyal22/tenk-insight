@@ -94,6 +94,10 @@ _EMBEDDINGS_REQUIRED: frozenset[str] = frozenset({"answer_relevancy", "answer_co
 _EMBEDDINGS_ONLY: frozenset[str] = frozenset({"semantic_similarity"})
 
 
+_BATCH_SIZE = 5          # samples per abatch_score call
+_INTER_BATCH_SLEEP = 10  # seconds between batches to stay within TPM limits
+
+
 class RagasEvaluator(BaseEvaluator):
     def __init__(self, judge_llm_config: JudgeLLMConfig) -> None:
         self._judge_llm_config = judge_llm_config
@@ -174,8 +178,12 @@ class RagasEvaluator(BaseEvaluator):
             if not scorable:
                 return
 
-            inputs = [_sample_to_kwargs(s, _METRIC_KWARGS[name]) for _, s in scorable]
-            results = await metric.abatch_score(inputs)
+            all_inputs = [_sample_to_kwargs(s, _METRIC_KWARGS[name]) for _, s in scorable]
+            results = []
+            for i in range(0, len(all_inputs), _BATCH_SIZE):
+                if i > 0:
+                    await asyncio.sleep(_INTER_BATCH_SLEEP)
+                results.extend(await metric.abatch_score(all_inputs[i:i + _BATCH_SIZE]))
             for (i, _), res in zip(scorable, results):
                 try:
                     v = float(res.value)
