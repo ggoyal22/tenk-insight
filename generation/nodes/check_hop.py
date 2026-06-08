@@ -62,11 +62,14 @@ def make_check_hop(llm: BaseLLM, config: GenerationConfig, prompt: str) -> Calla
             for r in group
         })
         pending_tasks = (
-            [RetrievalTask.model_validate({
-                **decision.next_task.model_dump(),
-                "exclude_parent_ids": seen_parent_ids,
-            })]
-            if not decision.done and decision.next_task
+            [
+                RetrievalTask.model_validate({
+                    **task.model_dump(),
+                    "exclude_parent_ids": seen_parent_ids,
+                })
+                for task in decision.next_tasks
+            ]
+            if not decision.done
             else []
         )
         logger.debug(

@@ -43,6 +43,14 @@ _KEYWORD_QUERY_RULES = (
 )
 
 
+_SEMANTIC_QUERY_RULES = (
+    "For cash-flow-statement metrics (capital expenditures, dividends paid, share "
+    "repurchases, debt issued or repaid), phrase the question in the statement's own "
+    'action language ("cash used/paid for X under investing/financing activities") so '
+    "semantic search targets the statement rather than MD&A prose."
+)
+
+
 _FILTER_FIELDS = (
     "\n"
     "  - ticker: company ticker symbol\n"
@@ -156,7 +164,7 @@ OUTPUT FIELDS:
 
 For each task:
 - `keyword_query`: {_KEYWORD_QUERY_RULES}
-- `semantic_query`: natural language question for this specific task (e.g. "What was Apple's total revenue for fiscal year 2024?") — used for semantic/vector search and HyDE expansion. For cash-flow-statement metrics (capital expenditures, dividends paid, share repurchases, debt issued or repaid), phrase the question in the statement's own action language ("cash used/paid for X under investing/financing activities") so vector search and HyDE target the statement rather than MD&A prose
+- `semantic_query`: natural language question for this specific task (e.g. "What was Apple's total revenue for fiscal year 2024?") — used for semantic/vector search and HyDE expansion. {_SEMANTIC_QUERY_RULES}
 - `filter`: {_FILTER_FIELDS}{_SECTION_LABELS}
 
 Task count:
@@ -278,17 +286,19 @@ Return a JSON object with exactly these fields:
 {{
   "reasoning": "<string>",
   "done": <boolean>,
-  "next_task": {{           // omit entirely when done is true
-    "keyword_query": "<string>",
-    "semantic_query": "<string>",
-    "filter": {{
-      "ticker": "<string|null>",
-      "fiscal_year": <integer|null>,
-      "section": "<string>" | null
+  "next_tasks": [          // empty list when done is true
+    {{
+      "keyword_query": "<string>",
+      "semantic_query": "<string>",
+      "filter": {{
+        "ticker": "<string|null>",
+        "fiscal_year": <integer|null>,
+        "section": "<string>" | null
+      }}
     }}
-  }}
+  ]
 }}
-Omit `next_task` entirely when `done` is true. Return only the JSON object — no text, preamble, or markdown fences before or after.
+Return an empty `next_tasks` list when `done` is true. Emit one task per company or period that still has a gap — never bundle two companies into one task; each task's filter targets exactly one ticker. Return only the JSON object — no text, preamble, or markdown fences before or after.
 
 Complete all reasoning steps inside the `reasoning` field before writing `done`. The value of `done` must follow from the completed reasoning — do not finalize it before finishing each step.
 
@@ -308,21 +318,21 @@ HARD RULE — Every figure you treat as sufficient must appear verbatim in the c
 
 3. GAP IDENTIFICATION — Only if step 1 or 2 reveals a gap: state the missing item as "[Metric] for [entity] for [period] is not present in any chunk." One sentence per gap.
 
-4. NEXT QUERY PLAN — Only if a gap exists: plan the next retrieval query. Apply the LOOP GUARD above before finalising.
+4. NEXT QUERY PLAN — Only if a gap exists: plan one retrieval query per remaining gap (one per company/period), each targeting exactly one ticker. Apply the LOOP GUARD above before finalising.
    - Before returning, remove any dates, fiscal year numbers, ticker symbols, or terms that appear in retrieved chunks from a different fiscal year or company than the gap you are trying to fill.
 
-5. DECISION — Set done: true if steps 1 and 2 reveal no gaps, or if any identified gap cannot be retrieved from a 10-K filing. Set done: false only when a concrete, named gap exists and the missing data is retrievable from a 10-K filing. Never treat inferred, estimated, or extrapolated figures as sufficient — only directly stated figures count as sufficient for this check. When done is true, omit next_task entirely.
+5. DECISION — Set done: true if steps 1 and 2 reveal no gaps, or if any identified gap cannot be retrieved from a 10-K filing. Set done: false only when a concrete, named gap exists and the missing data is retrievable from a 10-K filing. Never treat inferred, estimated, or extrapolated figures as sufficient — only directly stated figures count as sufficient for this check. When done is true, return an empty next_tasks list.
 
 ---
 {_SECTION_LABELS}
 
-When done is false, populate next_task:
+When done is false, populate next_tasks — one entry per remaining gap, each targeting exactly one ticker:
 - keyword_query: {_KEYWORD_QUERY_RULES}
   Exception: if specific entity names (e.g. segment names, geographic region names, product line names) already appear in the retrieved context and are directly relevant to the question, use those exact names — the category-term rule does not apply when specific member names are already known from retrieved context.
-- semantic_query: one sentence natural language question for the specific missing information
+- semantic_query: one sentence natural language question for the specific missing information. {_SEMANTIC_QUERY_RULES}
 - filter:{_FILTER_FIELDS}  Use only ticker symbols and fiscal years that appear in the question or retrieved context — do not invent values. section must be one of the values in Section Labels above or JSON null — never invent a label.
 
-Examples:
+Examples (each block is one entry in the next_tasks list):
 
 Segment revenue gap (null section, unknown members):
 {{
@@ -336,7 +346,21 @@ Cross-reference chunk — retry with section: null:
   "keyword_query": "total assets liabilities stockholders equity",
   "semantic_query": "What were total assets, liabilities, and stockholders equity on the balance sheet?",
   "filter": {{"ticker": "MSFT", "fiscal_year": 2024, "section": null}}
-}}"""
+}}
+
+Gaps for two companies — one task each, never bundled into a single entry:
+[
+  {{
+    "keyword_query": "property equipment additions purchases",
+    "semantic_query": "How much cash did Microsoft use for additions to property and equipment under investing activities?",
+    "filter": {{"ticker": "MSFT", "fiscal_year": 2025, "section": null}}
+  }},
+  {{
+    "keyword_query": "property equipment payments acquisition",
+    "semantic_query": "How much cash did Apple use for payments for acquisition of property and equipment under investing activities?",
+    "filter": {{"ticker": "AAPL", "fiscal_year": 2025, "section": null}}
+  }}
+]"""
 
 
 # ── Reflection ────────────────────────────────────────────────────────────────

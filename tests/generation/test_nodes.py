@@ -625,7 +625,7 @@ def test_check_hop_returns_empty_tasks_when_done():
 
 def test_check_hop_returns_next_task_when_not_done():
     next_task = RetrievalTaskNoHyde(keyword_query="follow-up query", semantic_query="What is the follow-up information?")
-    decision = HopDecision(reasoning="Gap identified.", done=False, next_task=next_task)
+    decision = HopDecision(reasoning="Gap identified.", done=False, next_tasks=[next_task])
     llm = _make_llm(structured_return=StructuredResponse(parsed=decision, usage=_make_usage()))
     result = _make_retrieval_result()
 
@@ -636,8 +636,23 @@ def test_check_hop_returns_next_task_when_not_done():
     assert output["pending_tasks"][0].keyword_query == "follow-up query"
 
 
-def test_check_hop_returns_empty_tasks_when_not_done_but_next_task_is_none():
-    decision = HopDecision(reasoning="Gap identified but no task.", done=False, next_task=None)
+def test_check_hop_returns_a_task_per_gap_when_not_done():
+    next_tasks = [
+        RetrievalTaskNoHyde(keyword_query="msft capex", semantic_query="What was Microsoft's capex?"),
+        RetrievalTaskNoHyde(keyword_query="aapl capex", semantic_query="What was Apple's capex?"),
+    ]
+    decision = HopDecision(reasoning="Two company gaps.", done=False, next_tasks=next_tasks)
+    llm = _make_llm(structured_return=StructuredResponse(parsed=decision, usage=_make_usage()))
+    result = _make_retrieval_result()
+
+    node = make_check_hop(llm, _gen_config(), "Decide if more retrieval is needed.")
+    output = node(_base_state(completed_results=[[result]], hop_count=0))
+
+    assert [t.keyword_query for t in output["pending_tasks"]] == ["msft capex", "aapl capex"]
+
+
+def test_check_hop_returns_empty_tasks_when_not_done_but_next_tasks_empty():
+    decision = HopDecision(reasoning="Gap identified but no task.", done=False, next_tasks=[])
     llm = _make_llm(structured_return=StructuredResponse(parsed=decision, usage=_make_usage()))
     result = _make_retrieval_result()
 

@@ -55,9 +55,12 @@ class QueryPlan(BaseModel):
 
 class HopDecision(BaseModel):
     """Structured output of the check_hop node."""
-    reasoning: str = Field(description="Scan context for sufficiency, identify gaps, and plan next query before deciding.")
+    reasoning: str = Field(description="Scan context for sufficiency, identify gaps, and plan next queries before deciding.")
     done: bool
-    next_task: RetrievalTaskNoHyde | None = None
+    next_tasks: list[RetrievalTaskNoHyde] = Field(
+        default_factory=list,
+        description="One task per remaining gap; each task's filter targets exactly one ticker. Empty when done.",
+    )
 
 
 class ReflectionDecision(BaseModel):

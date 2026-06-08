@@ -133,14 +133,23 @@ def test_query_plan_resolved_query_has_description_in_schema():
 def test_hop_decision_done():
     hd = HopDecision(reasoning="No gaps found.", done=True)
     assert hd.done is True
-    assert hd.next_task is None
+    assert hd.next_tasks == []
 
 
 def test_hop_decision_not_done_with_task():
     task = RetrievalTaskNoHyde(keyword_query="follow-up query", semantic_query="What is the follow-up information?")
-    hd = HopDecision(reasoning="Follow-up needed.", done=False, next_task=task)
+    hd = HopDecision(reasoning="Follow-up needed.", done=False, next_tasks=[task])
     assert hd.done is False
-    assert hd.next_task.keyword_query == "follow-up query"
+    assert hd.next_tasks[0].keyword_query == "follow-up query"
+
+
+def test_hop_decision_not_done_with_multiple_tasks():
+    tasks = [
+        RetrievalTaskNoHyde(keyword_query="msft capex", semantic_query="What was Microsoft's capex?"),
+        RetrievalTaskNoHyde(keyword_query="aapl capex", semantic_query="What was Apple's capex?"),
+    ]
+    hd = HopDecision(reasoning="Two gaps.", done=False, next_tasks=tasks)
+    assert [t.keyword_query for t in hd.next_tasks] == ["msft capex", "aapl capex"]
 
 
 def test_hop_decision_has_json_schema():

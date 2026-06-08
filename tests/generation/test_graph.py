@@ -488,7 +488,7 @@ def test_hop_enabled_triggers_extra_retrieval():
                     parsed=HopDecision(
                         reasoning="Data center segment data needed.",
                         done=False,
-                        next_task=RetrievalTaskNoHyde(keyword_query="NVDA data center segment revenue", semantic_query="What was NVIDIA's data center segment revenue?"),
+                        next_tasks=[RetrievalTaskNoHyde(keyword_query="NVDA data center segment revenue", semantic_query="What was NVIDIA's data center segment revenue?")],
                     ),
                     usage=_usage(),
                 )
