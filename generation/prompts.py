@@ -30,7 +30,8 @@ _KEYWORD_QUERY_RULES = (
     "do NOT enumerate specific member names absent from the original query — use the "
     "category term instead, which co-occurs with all members in headers and tables. "
     'Examples: headcount → "employees headcount"; gross margin → "gross profit revenue cost"; '
-    'free cash flow → "operating activities capital expenditures"; '
+    'free cash flow → "operating activities property equipment"; '
+    'capital expenditures / capex → "property equipment"; '
     'segment revenues (names unknown) → "reportable segments revenue".'
 )
 
@@ -288,7 +289,9 @@ If the context is empty (no chunks were retrieved), set done: false and construc
 
 LOOP GUARD — Never emit a keyword_query or semantic_query that is verbatim or near-verbatim identical to any query in the current context or "Queries already attempted" list. Change at least one of: keyword terms, semantic phrasing, or section filter. If no meaningfully different reformulation is possible, set done: true.
 
-1. SUFFICIENCY SCAN — One line per chunk: note chunk ID, what it covers, and whether it's sufficient. Note two special cases:
+HARD RULE — Every figure you treat as sufficient must appear verbatim in the chunk text. Do not use any value you recall from training data or prior knowledge — if you cannot quote it word-for-word from a chunk in the current context, it does not exist for the purposes of this check.
+
+1. SUFFICIENCY SCAN — One line per chunk: note chunk ID, what it covers, and whether it's sufficient. For each chunk you mark as sufficient for a specific metric, quote the exact phrase from the chunk text that states the figure (e.g. "chunk says: 'Additions to property and equipment: $64,551'"). If you cannot quote the figure verbatim from the chunk, the chunk is not sufficient for that metric. Note two special cases:
    - Cross-reference chunks: if a chunk contains only a redirect (e.g. "The information required by this Item is set forth in our Consolidated Financial Statements and Notes thereto"), it does not count as sufficient — treat as a gap and plan a retry with section: null.
    - Conflicting chunks: if multiple chunks report different values for the same metric, note the conflict and treat as a gap.
 
