@@ -335,29 +335,26 @@
         obligations?
   answer: |
     In September 2025, Pfizer entered into an arrangement with Abingworth under which Pfizer would receive up to $200 million from 2025 through 2027 to co-fund quarterly development costs for specified programs. The arrangement reduced Pfizer's research and development expenses by $54 million in 2025. Upon potential regulatory approval in the U.S., Abingworth would be eligible to receive an approval-based fixed milestone payment of up to $120 million, payable over a period of approximately eighteen months.
-- query: As of December 31, 2025, how many individuals did Tesla include in its SEC-required
-    pay ratio analysis, and what was the ratio of Elon Musk's reported total compensation
-    to the median non-CEO qualifying employee's annual total compensation for fiscal year
-    2025?
+- query: As of December 31, 2025, what was Tesla's worldwide employee headcount, and what
+    percentage of employees were included in total rewards packages emphasizing stock
+    ownership?
   query_type: single
-  difficulty: hard
+  difficulty: medium
   answer: |
-    Tesla included 135,623 individuals in its fiscal year 2025 pay ratio analysis (full-time, part-time, and temporary employees, excluding Elon Musk and employees of staffing agencies). Elon Musk's 2025 annual total compensation as reported in the Summary Compensation Table was $158,359,009,867, the vast majority of which reflects an accounting-driven valuation for the 2025 CEO Performance Award. The median 2025 annual total compensation of all other qualifying employees was $62,786. The resulting ratio of reported CEO compensation to median employee compensation was 2,522,203:1.
-- query: What revenue did Tesla recognize from xAI under their commercial agreements in fiscal
-    year 2025, what product primarily drove that revenue, and how much did Tesla pay to xAI
-    in expenses under the same agreements during the same period?
+    As of December 31, 2025, Tesla's worldwide employee headcount was 134,785. Tesla emphasizes stock ownership opportunities, with 92% of employees included in total rewards packages.
+- query: What revenue and cost of revenues did Tesla recognize from xAI's purchase of its
+    Megapack products in fiscal year 2025?
   query_type: single
-  difficulty: hard
+  difficulty: medium
   answer: |
-    Tesla recognized approximately $430.1 million in revenue from xAI in fiscal year 2025, primarily for the sale of Megapack products. Tesla also incurred approximately $4.0 million in expenses to xAI under their commercial, consulting, and support agreements during the same period.
+    In fiscal year 2025, Tesla recognized $430 million of revenues and $285 million of cost of revenues from xAI for its purchase of Tesla's Megapack products in the ordinary course of business.
 - query: As of December 31, 2025, how many shares of Tesla common stock were available for
-    future issuance under equity compensation plans approved by security holders, and how
-    was that total split between the 2019 Equity Incentive Plan and the 2019 Employee Stock
+    future issuance under each of the 2019 Equity Incentive Plan and the 2019 Employee Stock
     Purchase Plan?
   query_type: single
   difficulty: hard
   answer: |
-    As of December 31, 2025, 158,290,410 shares were available for future issuance under Tesla equity compensation plans approved by security holders: 64,682,073 shares remaining available under the Tesla, Inc. Amended and Restated 2019 Equity Incentive Plan, and 93,608,337 shares remaining available under the Tesla, Inc. 2019 Employee Stock Purchase Plan.
+    As of December 31, 2025, Tesla reported 64.7 million shares reserved and available for general issuance under the Amended and Restated 2019 Equity Incentive Plan and 93.6 million shares available for issuance under the 2019 Employee Stock Purchase Plan.
 - query: As of December 31, 2025, what were the three largest unions representing Boeing's
     workforce by percentage of total employees, and what was the expiration date of the IAM
     District 751 collective bargaining agreement covering Washington state manufacturing employees?

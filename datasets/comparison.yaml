@@ -98,13 +98,6 @@
       query: AMD goodwill balance sheet fiscal year 2024
   answer: |
     At the end of NVIDIA's fiscal year 2024 (January 28, 2024), NVIDIA's goodwill was $4,430 million. At the end of AMD's fiscal year 2024 (December 28, 2024), AMD's goodwill was $24,839 million.
-- query: How many total employees or qualifying individuals did Tesla and Boeing each have
-    as of December 31, 2025, and what percentage of each company's workforce was based outside
-    the United States?
-  query_type: comparison
-  difficulty: medium
-  answer: |
-    As of December 31, 2025, Tesla had 135,623 qualifying individuals in its pay ratio analysis (full-time, part-time, and temporary employees, excluding Elon Musk and staffing agency employees), of whom approximately 43% were based outside the United States. Boeing had a total workforce of approximately 182,000, of whom approximately 14% were located outside the United States.
 - query: Which accounting firm conducted the annual financial statement audit for Tesla and
     which for Boeing in fiscal year 2025, and in what city was each firm's audit engagement
     based?
@@ -112,13 +105,6 @@
   difficulty: medium
   answer: |
     PricewaterhouseCoopers LLP, based in San Jose, California, served as Tesla's external auditor for fiscal year 2025. Deloitte & Touche LLP, based in Seattle, Washington, served as Boeing's external auditor for fiscal year 2025.
-- query: What proportion of Boeing's total workforce was represented by its largest union
-    as of December 31, 2025, and what proportion of Tesla's pay ratio qualifying workforce
-    consisted of production line employees as of the same date?
-  query_type: comparison
-  difficulty: medium
-  answer: |
-    As of December 31, 2025, the International Association of Machinists and Aerospace Workers (IAM), Boeing's largest union, represented 25% of Boeing's total workforce of approximately 182,000, as disclosed in Boeing's fiscal year 2025 10-K. Approximately 33% of Tesla's 135,623 pay ratio qualifying employees were production line employees, as disclosed in Tesla's fiscal year 2025 annual filing.
 - query: How did Apple's effective tax rate for fiscal year 2025 compare to Microsoft's effective
     tax rate for fiscal year 2025?
   query_type: comparison
