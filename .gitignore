@@ -8,7 +8,8 @@
 *.env
 !.env.example
 
-# All data — raw filings, golden datasets, and eval artifacts are managed separately
+# Runtime data — raw filings (downloaded from EDGAR) and eval artifacts are
+# generated locally, not committed. Version-controlled golden datasets live in datasets/.
 data/
 
 # Python

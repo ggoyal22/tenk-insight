@@ -28,12 +28,14 @@ from tracing.setup import setup_tracing
 logger = logging.getLogger(__name__)
 
 SUGGESTED_QUESTIONS = [
-    "What were NVIDIA's main risk factors in its most recent 10-K?",
-    "How did NVIDIA describe demand for its AI and data center chips?",
-    "What did NVIDIA say about export controls and geopolitical risks?",
-    "How has NVIDIA's revenue and gross margin changed over recent years?",
-    "What competition does NVIDIA face in the GPU and AI accelerator market?",
-    "What did NVIDIA disclose about its supply chain and manufacturing partners?",
+    "What were Apple's total net sales in fiscal year 2025?",
+    "What were Pfizer's total revenues in 2025?",
+    "As of December 31, 2025, what was Tesla's worldwide employee headcount, and what percentage of employees were included in total rewards packages emphasizing stock ownership?",
+    "What labor action affected Boeing's St. Louis area operations in 2025, and what was its duration and operational impact?",
+    "What were AMD's Embedded segment net revenue and operating income in 2024, and what drove the year-over-year changes?",
+    "What total revenue did NVIDIA, Apple, and Microsoft each report for fiscal year 2025?",
+    "How did NVIDIA's total revenue for fiscal year 2025 compare to ExxonMobil's sales and other operating revenue for fiscal year 2025?",
+    "What was NVIDIA's gross margin in fiscal year 2025, and how did it compare to fiscal year 2024?",
 ]
 
 
