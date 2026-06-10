@@ -116,9 +116,3 @@
   difficulty: hard
   answer: |
     No relevant information was retrieved. Pfizer's fiscal year 2025 10-K omits executive compensation information and incorporates it by reference from the company's 2026 Proxy Statement (DEF 14A). The Summary Compensation Table is in the proxy filing, which is not ingested in this corpus.
-- query: How many vehicles did Tesla deliver in fiscal year 2025, and what was its total automotive
-    revenue for the year?
-  query_type: out_of_scope
-  difficulty: hard
-  answer: |
-    No relevant information was retrieved. The only Tesla filing in the corpus is a 10-K/A amendment for fiscal year ended December 31, 2025, which contains only Part III information (directors, executive compensation, security ownership). It includes no financial statements or operating metrics. Vehicle delivery and automotive revenue data are not present in the available filing.

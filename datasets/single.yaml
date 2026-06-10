@@ -1,177 +1,75 @@
 - query: What were Apple's total net sales in fiscal year 2025?
   query_type: single
   difficulty: easy
-  expected_tasks:
-  - filter:
-      ticker: AAPL
-      form_type: 10-K
-      fiscal_year: '2025'
-      section: '8'
-      query: Apple total net sales fiscal year 2025
   answer: |
     Apple's total net sales in fiscal year 2025 were $416,161 million.
 - query: How many full-time equivalent employees did Apple have as of September 27, 2025?
   query_type: single
   difficulty: easy
-  expected_tasks:
-  - filter:
-      ticker: AAPL
-      form_type: 10-K
-      fiscal_year: '2025'
-      section: '1'
-      query: Apple number of full-time equivalent employees as of September 27, 2025
   answer: |
     As of September 27, 2025, Apple had approximately 166,000 full-time equivalent employees.
 - query: What was Microsoft's net income for the fiscal year ended June 30, 2025?
   query_type: single
   difficulty: easy
-  expected_tasks:
-  - filter:
-      ticker: MSFT
-      form_type: 10-K
-      fiscal_year: '2025'
-      section: '8'
-      query: Microsoft net income fiscal year ended June 30, 2025
   answer: |
     Microsoft's net income for the fiscal year ended June 30, 2025 was $101,832 million.
 - query: Who was Microsoft's independent registered public accounting firm for fiscal year
     2025, and what is its PCAOB ID?
   query_type: single
   difficulty: easy
-  expected_tasks:
-  - filter:
-      ticker: MSFT
-      form_type: 10-K
-      fiscal_year: '2025'
-      section: '14'
-      query: Microsoft independent registered public accounting firm auditor PCAOB ID fiscal
-        year 2025
   answer: |
     Microsoft's independent registered public accounting firm (principal accountant) for fiscal year 2025 was Deloitte & Touche LLP, PCAOB ID No. 34.
 - query: What were AMD's total assets as of December 28, 2024?
   query_type: single
   difficulty: easy
-  expected_tasks:
-  - filter:
-      ticker: AMD
-      form_type: 10-K
-      fiscal_year: '2024'
-      section: '8'
-      query: AMD total assets as of December 28, 2024
   answer: |
     AMD's total assets as of December 28, 2024 were $69,226 million.
 - query: What were Pfizer's total revenues in 2025?
   query_type: single
   difficulty: easy
-  expected_tasks:
-  - filter:
-      ticker: PFE
-      form_type: 10-K
-      fiscal_year: '2025'
-      section: '8'
-      query: Pfizer total revenues 2025
   answer: |
     Pfizer's total revenues in 2025 were $62,579 million.
 - query: What were NVIDIA's total assets as of January 26, 2025?
   query_type: single
   difficulty: easy
-  expected_tasks:
-  - filter:
-      ticker: NVDA
-      form_type: 10-K
-      fiscal_year: '2025'
-      section: '15'
-      query: NVIDIA total assets as of January 26, 2025
   answer: |
     NVIDIA's total assets as of January 26, 2025 were $111,601 million.
 - query: How much did NVIDIA pay in cash dividends to its shareholders in fiscal year 2025?
   query_type: single
   difficulty: easy
-  expected_tasks:
-  - filter:
-      ticker: NVDA
-      form_type: 10-K
-      fiscal_year: '2025'
-      section: '5'
-      query: NVIDIA cash dividends paid to shareholders in fiscal year 2025
   answer: |
     In fiscal year 2025, NVIDIA paid cash dividends to its shareholders of $834 million.
 - query: What were Boeing's total revenues in 2025?
   query_type: single
   difficulty: easy
-  expected_tasks:
-  - filter:
-      ticker: BA
-      form_type: 10-K
-      fiscal_year: '2025'
-      section: '8'
-      query: Boeing total revenues 2025
   answer: |
     Boeing's total revenues in 2025 were $89,463 million.
 - query: What was the size of Boeing's total workforce as of December 31, 2025?
   query_type: single
   difficulty: easy
-  expected_tasks:
-  - filter:
-      ticker: BA
-      form_type: 10-K
-      fiscal_year: '2025'
-      section: '1'
-      query: Boeing total workforce as of December 31, 2025
   answer: |
     As of December 31, 2025, Boeing's total workforce was approximately 182,000, with 14% located outside of the U.S.
 - query: What were ExxonMobil's total assets as of December 31, 2025?
   query_type: single
   difficulty: easy
-  expected_tasks:
-  - filter:
-      ticker: XOM
-      form_type: 10-K
-      fiscal_year: '2025'
-      section: '16'
-      query: ExxonMobil total assets as of December 31, 2025
   answer: |
     ExxonMobil's total assets as of December 31, 2025 were $448,980 million.
 - query: How many registered shareholders of ExxonMobil common stock were there at December
     31, 2025?
   query_type: single
   difficulty: easy
-  expected_tasks:
-  - filter:
-      ticker: XOM
-      form_type: 10-K
-      fiscal_year: '2025'
-      section: '5'
-      query: ExxonMobil number of registered shareholders of common stock at December 31,
-        2025
   answer: |
     There were 276,536 registered shareholders of ExxonMobil common stock at December 31, 2025.
 - query: What was NVIDIA's total operating income in fiscal year 2025, and what was the year-over-year
     change?
   query_type: single
   difficulty: medium
-  expected_tasks:
-  - filter:
-      ticker: NVDA
-      form_type: 10-K
-      fiscal_year: '2025'
-      section: '7'
-      query: What was NVIDIA's total operating income in fiscal year 2025 and how did it change
-        from the prior year?
   answer: |
     NVIDIA's total operating income was $81,453 million in fiscal year 2025, up 147% from $32,972 million in fiscal year 2024.
 - query: What were AMD's Embedded segment net revenue and operating income in 2024, and what
     drove the year-over-year changes?
   query_type: single
   difficulty: medium
-  expected_tasks:
-  - filter:
-      ticker: AMD
-      form_type: 10-K
-      fiscal_year: '2024'
-      section: '7'
-      query: What were AMD's Embedded segment net revenue and operating income in 2024 and
-        what caused the changes from 2023?
   answer: |
     AMD's Embedded segment net revenue was $3.6 billion in 2024, down 33% from $5.3 billion in 2023, primarily due to lower demand as customers continued to normalize their inventory levels. Embedded operating income was $1.4 billion in 2024, compared to $2.6 billion in 2023, with the decrease primarily driven by lower revenue.
 - query: What manufacturing dependency did AMD identify as a material risk for its microprocessor
@@ -179,42 +77,18 @@
     agreement with GlobalFoundries?
   query_type: single
   difficulty: medium
-  expected_tasks:
-  - filter:
-      ticker: AMD
-      form_type: 10-K
-      fiscal_year: '2024'
-      section: 1A
-      query: What manufacturing risks does AMD disclose related to TSMC and third-party wafer
-        fabrication for its GPU and microprocessor products?
   answer: |
     AMD identified dependence on TSMC for manufacturing wafers for its microprocessor and GPU products at 7nm or smaller nodes as a material risk; if TSMC cannot manufacture these products in sufficient quantities, it could have a material adverse effect on AMD's business. AMD was also party to a wafer supply agreement with GlobalFoundries under which GlobalFoundries would provide a minimum annual capacity allocation and set pricing through 2026.
 - query: How many full-time employees did Microsoft have as of June 30, 2025, and how were
     they distributed across business functions?
   query_type: single
   difficulty: medium
-  expected_tasks:
-  - filter:
-      ticker: MSFT
-      form_type: 10-K
-      fiscal_year: '2025'
-      section: '1'
-      query: How many full-time employees did Microsoft employ as of June 30, 2025 and what
-        was the breakdown by business function?
   answer: |
     As of June 30, 2025, Microsoft employed approximately 228,000 people on a full-time basis, with 125,000 in the U.S. and 103,000 internationally. Of the total, 89,000 were in operations, 80,000 in product research and development, 44,000 in sales and marketing, and 15,000 in general and administration.
 - query: What cybersecurity incident involving a nation-state threat actor did Microsoft describe
     in its fiscal year 2025 annual report, and what did the threat actor gain access to?
   query_type: single
   difficulty: medium
-  expected_tasks:
-  - filter:
-      ticker: MSFT
-      form_type: 10-K
-      fiscal_year: '2025'
-      section: 1A
-      query: What nation-state cybersecurity incident does Microsoft disclose in its fiscal
-        year 2025 10-K, including the attack method and systems accessed?
   answer: |
     Beginning in late November 2023, a nation-state associated threat actor used a password spray attack to compromise a legacy test account and gain access to Microsoft email accounts. The threat actor used information obtained to gain unauthorized access to some of Microsoft's source code repositories and internal systems.
 - query: What IP litigation risk related to emerging technologies did Apple identify in its
@@ -222,15 +96,6 @@
     infringement actions?
   query_type: single
   difficulty: medium
-  expected_tasks:
-  - filter:
-      ticker: AAPL
-      form_type: 10-K
-      fiscal_year: '2025'
-      section: 1A
-      query: What does Apple disclose about patent infringement litigation risk in fiscal
-        year 2025, including risks related to AI and machine learning and the geographic scope
-        of active defense actions?
   answer: |
     Apple disclosed that risks of patent claims and novel IP claims may be exacerbated as new and emerging technologies, including machine learning and artificial intelligence, are further integrated into its products and services. The Company is vigorously defending infringement actions in courts in several U.S. jurisdictions as well as internationally in various countries.
 - query: What was Apple's total balance of cash, cash equivalents, and marketable securities
@@ -238,70 +103,30 @@
     fixed-rate notes?
   query_type: single
   difficulty: medium
-  expected_tasks:
-  - filter:
-      ticker: AAPL
-      form_type: 10-K
-      fiscal_year: '2025'
-      section: '7'
-      query: What was Apple's total cash, cash equivalents, and marketable securities balance
-        and outstanding fixed-rate notes principal as of September 27, 2025?
   answer: |
     As of September 27, 2025, Apple's cash, cash equivalents, and marketable securities totaled $132.4 billion. The Company had outstanding fixed-rate notes with an aggregate principal amount of $91.3 billion, of which $12.4 billion was payable within 12 months.
 - query: What clinical-stage company did Pfizer acquire in November 2025, at what price per
     share, and what was its therapeutic focus?
   query_type: single
   difficulty: medium
-  expected_tasks:
-  - filter:
-      ticker: PFE
-      form_type: 10-K
-      fiscal_year: '2025'
-      section: '8'
-      query: What acquisition did Pfizer complete in November 2025, including the target company,
-        price per share, and therapeutic area?
   answer: |
     On November 13, 2025, Pfizer acquired Metsera, a clinical-stage biopharmaceutical company accelerating the next generation of medicines for obesity and cardiometabolic diseases, for $65.60 per share.
 - query: What was Pfizer's acquired in-process research and development expense in 2025, and
     what specific transactions drove the year-over-year change?
   query_type: single
   difficulty: medium
-  expected_tasks:
-  - filter:
-      ticker: PFE
-      form_type: 10-K
-      fiscal_year: '2025'
-      section: '7'
-      query: What was Pfizer's acquired in-process R&D expense in 2025 and what in-licensing
-        agreements caused the increase from 2024?
   answer: |
     Pfizer's acquired in-process research and development expense was $1,613 million in 2025, up from $108 million in 2024. The increase was primarily driven by a $1.35 billion charge related to an in-licensing agreement with 3SBio and a $150 million charge related to an in-licensing agreement with YaoPharma.
 - query: What labor action affected Boeing's St. Louis area operations in 2025, and what was
     its duration and operational impact?
   query_type: single
   difficulty: medium
-  expected_tasks:
-  - filter:
-      ticker: BA
-      form_type: 10-K
-      fiscal_year: '2025'
-      section: '1'
-      query: What strike or labor action did Boeing experience at its St. Louis area sites
-        in 2025, how long did it last, and which programs were affected?
   answer: |
     In 2025, employees represented by IAM District 837, which represents approximately 3,200 employees at Boeing's St. Louis area sites, went on strike for 101 days. The strike disrupted Boeing's St. Louis operations and impacted programs including F/A-18, F-15, T-7A, MQ-25, and Weapons.
 - query: What percentage of ExxonMobil's global employees are based outside the United States,
     and what is the average length of service for career employees?
   query_type: single
   difficulty: medium
-  expected_tasks:
-  - filter:
-      ticker: XOM
-      form_type: 10-K
-      fiscal_year: '2025'
-      section: '1'
-      query: What does ExxonMobil disclose about the geographic distribution of its global
-        workforce and the average career tenure of its employees?
   answer: Over 59 percent of ExxonMobil's global employees are from outside the U.S. The average
     length of service is about 30 years for career employees.
 - query: What percentage of NVIDIA's total revenue did its largest direct customer and largest
@@ -309,14 +134,6 @@
     each attributed?
   query_type: single
   difficulty: hard
-  expected_tasks:
-  - filter:
-      ticker: NVDA
-      form_type: 10-K
-      fiscal_year: '2024'
-      section: 1A
-      query: What customer concentration risk does NVIDIA disclose for fiscal year 2024, including
-        revenue percentages for its largest direct and indirect customers?
   answer: |
     NVIDIA's largest direct customer, referred to as Customer A, represented 13% of total revenue for fiscal year 2024, attributable to the Compute & Networking segment. One indirect customer, which primarily purchases through system integrators and distributors including through Customer A, is estimated to have represented approximately 19% of total revenue for fiscal year 2024, also attributable to the Compute & Networking segment.
 - query: What R&D co-funding arrangement did Pfizer enter into with Abingworth in September
@@ -324,15 +141,6 @@
     payment?
   query_type: single
   difficulty: hard
-  expected_tasks:
-  - filter:
-      ticker: PFE
-      form_type: 10-K
-      fiscal_year: '2025'
-      section: '8'
-      query: What were the terms of Pfizer's R&D funding arrangement with Abingworth entered
-        in September 2025, including funding amount, R&D expense impact, and milestone payment
-        obligations?
   answer: |
     In September 2025, Pfizer entered into an arrangement with Abingworth under which Pfizer would receive up to $200 million from 2025 through 2027 to co-fund quarterly development costs for specified programs. The arrangement reduced Pfizer's research and development expenses by $54 million in 2025. Upon potential regulatory approval in the U.S., Abingworth would be eligible to receive an approval-based fixed milestone payment of up to $120 million, payable over a period of approximately eighteen months.
 - query: As of December 31, 2025, what was Tesla's worldwide employee headcount, and what
