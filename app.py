@@ -39,6 +39,19 @@ SUGGESTED_QUESTIONS = [
 ]
 
 
+# Cap how much conversation history is fed back into the model. The full
+# transcript still renders on screen; only the model's context is bounded so
+# token cost and latency stay flat and never overflow the context window.
+MAX_HISTORY_MESSAGES = 6  # last 3 user/assistant pairs
+
+
+def _md(text: str) -> str:
+    """Escape '$' so Streamlit markdown doesn't treat dollar amounts as LaTeX
+    math, which renders figures in a different font/colour from the surrounding
+    text."""
+    return text.replace("$", "\\$")
+
+
 def _citation_to_dict(c: Citation) -> dict:
     return {
         "index": c.index,
@@ -89,25 +102,31 @@ def render_citations(citations: list[dict]) -> None:
 
 def render_feedback(msg_index: int, query: str, answer: str, repo: FeedbackRepo) -> None:
     submitted_key = f"fb_submitted_{msg_index}"
+    id_key = f"fb_id_{msg_index}"
 
     if st.session_state.get(submitted_key):
+        st.caption("Thanks for your feedback.")
         return
 
     st.caption("Rate this answer")
     rating = st.feedback("thumbs", key=f"fb_{msg_index}")
 
-    if rating is not None:
+    # Persist the rating the instant it's given so it is never lost if the user
+    # moves on without adding a comment. The id lets an optional comment be
+    # attached to the same row afterwards.
+    if rating is not None and id_key not in st.session_state:
+        st.session_state[id_key] = repo.insert_feedback(
+            query=query, answer=answer, rating=bool(rating), comment=None,
+        )
+
+    if id_key in st.session_state:
         comment = st.text_area(
             "comment", key=f"fb_comment_{msg_index}", height=68,
             label_visibility="collapsed", placeholder="Add a comment (optional)",
         )
         if st.button("Submit", key=f"fb_submit_{msg_index}", type="tertiary"):
-            repo.insert_feedback(
-                query=query,
-                answer=answer,
-                rating=bool(rating),
-                comment=comment.strip() or None,
-            )
+            if comment.strip():
+                repo.update_comment(st.session_state[id_key], comment.strip())
             st.session_state[submitted_key] = True
             st.rerun()
 
@@ -115,12 +134,14 @@ def render_feedback(msg_index: int, query: str, answer: str, repo: FeedbackRepo)
 def submit_query(query: str, graph, config, feedback_repo: FeedbackRepo) -> None:
     st.session_state.messages.append({"role": "user", "content": query})
     with st.chat_message("user"):
-        st.markdown(query)
+        st.markdown(_md(query))
 
     with st.chat_message("assistant"):
         try:
             with st.status("Processing...", expanded=True) as status:
-                state = make_initial_state(query, history=st.session_state.history)
+                state = make_initial_state(
+                    query, history=st.session_state.history[-MAX_HISTORY_MESSAGES:]
+                )
                 result: GenerationResult | None = None
                 pipeline_usage: list[LLMUsage] = []
                 for mode, data in graph.stream(state, stream_mode=["updates", "custom"]):
@@ -151,7 +172,7 @@ def submit_query(query: str, graph, config, feedback_repo: FeedbackRepo) -> None
         usage = total_pipeline_usage(pipeline_usage)
         cost = compute_cost(usage, config.llm.model, config.llm.provider)
         cost_str = f"${cost:.4f}" if isinstance(cost, float) else cost
-        st.markdown(result.answer)
+        st.markdown(_md(result.answer))
         citations = [_citation_to_dict(c) for c in result.citations]
         render_citations(citations)
         total = usage.input_tokens + usage.output_tokens
@@ -185,6 +206,29 @@ def main() -> None:
         layout="wide",
     )
 
+    # Trim Streamlit's default top spacing on the sidebar so the title and
+    # "New chat" button sit at the top instead of below an empty gap. The gap
+    # comes from both the sidebar header (which holds the collapse button) and
+    # the user-content padding, so both are reduced.
+    st.markdown(
+        """
+        <style>
+        [data-testid="stSidebarHeader"] {
+            padding-top: 0.5rem;
+            padding-bottom: 0;
+            height: auto;
+        }
+        [data-testid="stSidebarUserContent"] {
+            padding-top: 0;
+        }
+        [data-testid="stMainBlockContainer"] {
+            padding-top: 2rem;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
     try:
         config, _db_client, graph, indexed, feedback_repo = load_pipeline()
     except Exception:
@@ -201,21 +245,20 @@ def main() -> None:
 
     with st.sidebar:
         st.title("Financial 10-K Q&A")
-        st.markdown("**Indexed filings**")
-        for ticker, company_name, years in indexed:
-            years_str = ", ".join(str(y) for y in years)
-            st.markdown(f"- `{ticker}` — {company_name} ({years_str})")
-        st.divider()
         if st.button("New chat", use_container_width=True):
             st.session_state.messages = []
             st.session_state.history = []
             for key in [k for k in st.session_state if k.startswith("fb_")]:
                 del st.session_state[key]
-            st.rerun()
+        st.divider()
+        st.markdown("**Indexed filings**")
+        for ticker, company_name, years in indexed:
+            years_str = ", ".join(str(y) for y in years)
+            st.markdown(f"- `{ticker}` — {company_name} ({years_str})")
 
     for i, msg in enumerate(st.session_state.messages):
         with st.chat_message(msg["role"]):
-            st.markdown(msg["content"])
+            st.markdown(_md(msg["content"]))
             if msg.get("citations"):
                 render_citations(msg["citations"])
             if msg.get("usage"):
@@ -239,6 +282,13 @@ def main() -> None:
         if clicked:
             submit_query(clicked, graph, config, feedback_repo)
             st.rerun()
+
+    # Once the conversation outgrows the model's context window, let the user
+    # know follow-ups only consider the most recent exchanges — the full
+    # transcript above can otherwise imply earlier turns still inform answers.
+    if len(st.session_state.history) > MAX_HISTORY_MESSAGES:
+        turns = MAX_HISTORY_MESSAGES // 2
+        st.caption(f"Follow-up questions use the last {turns} exchanges for context.")
 
     st.caption(f"Generation model: {config.llm.model}")
     if prompt := st.chat_input("Ask a question about SEC filings..."):

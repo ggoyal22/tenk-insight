@@ -16,7 +16,7 @@ def make_hyde_expand(llm: BaseLLM, prompt: str) -> Callable[[GenerationState], d
         write = get_writer()
         tasks = state["pending_tasks"]
         total = len(tasks)
-        write(f"HyDE: expanding {total} {'query' if total == 1 else 'queries'}...")
+        write(f"Expanding {total} search {'query' if total == 1 else 'queries'}...")
 
         def _expand_one(task: RetrievalTask) -> tuple[RetrievalTask, LLMUsage | None]:
             messages = [
