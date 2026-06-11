@@ -395,7 +395,7 @@ def test_reflection_low_quality_triggers_extra_retrieval():
                         reasoning="Gross margin not found in context.",
                         quality="low",
                         reason="missing gross margin",
-                        next_task=RetrievalTaskNoHyde(keyword_query="NVDA gross margin 2024", semantic_query="What was NVIDIA's gross margin in FY2024?"),
+                        next_tasks=[RetrievalTaskNoHyde(keyword_query="NVDA gross margin 2024", semantic_query="What was NVIDIA's gross margin in FY2024?")],
                     ),
                     usage=_usage(),
                 )
@@ -571,7 +571,7 @@ def test_reflection_exhausted_terminates_after_max_iterations():
                     reasoning="Answer is still incomplete.",
                     quality="low",
                     reason="still incomplete",
-                    next_task=RetrievalTaskNoHyde(keyword_query="more data", semantic_query="What is the additional data needed?"),
+                    next_tasks=[RetrievalTaskNoHyde(keyword_query="more data", semantic_query="What is the additional data needed?")],
                 ),
                 usage=_usage(),
             )

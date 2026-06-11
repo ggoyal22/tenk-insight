@@ -164,14 +164,14 @@ def test_hop_decision_has_json_schema():
 def test_reflection_decision_high_quality():
     rd = ReflectionDecision(reasoning="Claims verified.", quality="high", reason="answer is complete and grounded")
     assert rd.quality == "high"
-    assert rd.next_task is None
+    assert rd.next_tasks == []
 
 
-def test_reflection_decision_low_quality_with_task():
+def test_reflection_decision_low_quality_with_tasks():
     task = RetrievalTaskNoHyde(keyword_query="missing revenue data", semantic_query="What is the missing revenue figure?")
-    rd = ReflectionDecision(reasoning="Revenue data missing.", quality="low", reason="revenue figure not in context", next_task=task)
+    rd = ReflectionDecision(reasoning="Revenue data missing.", quality="low", reason="revenue figure not in context", next_tasks=[task])
     assert rd.quality == "low"
-    assert rd.next_task.keyword_query == "missing revenue data"
+    assert rd.next_tasks[0].keyword_query == "missing revenue data"
 
 
 def test_reflection_decision_rejects_invalid_quality():

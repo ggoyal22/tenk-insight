@@ -682,7 +682,7 @@ def test_reflect_returns_empty_tasks_on_high_quality():
 
 def test_reflect_returns_next_task_on_low_quality():
     next_task = RetrievalTaskNoHyde(keyword_query="missing data", semantic_query="What is the missing data?")
-    decision = ReflectionDecision(reasoning="Revenue figure not found.", quality="low", reason="revenue figure missing", next_task=next_task)
+    decision = ReflectionDecision(reasoning="Revenue figure not found.", quality="low", reason="revenue figure missing", next_tasks=[next_task])
     llm = _make_llm(structured_return=StructuredResponse(parsed=decision, usage=_make_usage()))
     result = _make_retrieval_result()
     answer = GenerationResult(answer="Incomplete answer.", citations=[])
@@ -694,8 +694,24 @@ def test_reflect_returns_next_task_on_low_quality():
     assert output["pending_tasks"][0].keyword_query == "missing data"
 
 
+def test_reflect_returns_one_task_per_gap_on_low_quality():
+    next_tasks = [
+        RetrievalTaskNoHyde(keyword_query="msft revenue", semantic_query="What was Microsoft's revenue?"),
+        RetrievalTaskNoHyde(keyword_query="aapl revenue", semantic_query="What was Apple's revenue?"),
+    ]
+    decision = ReflectionDecision(reasoning="Both companies ungrounded.", quality="low", reason="two gaps", next_tasks=next_tasks)
+    llm = _make_llm(structured_return=StructuredResponse(parsed=decision, usage=_make_usage()))
+    result = _make_retrieval_result()
+    answer = GenerationResult(answer="Incomplete comparison.", citations=[])
+
+    node = make_reflect(llm, _gen_config(), "Evaluate the answer quality.")
+    output = node(_base_state(completed_results=[[result]], answer=answer, reflection_count=0))
+
+    assert [t.keyword_query for t in output["pending_tasks"]] == ["msft revenue", "aapl revenue"]
+
+
 def test_reflect_returns_empty_tasks_when_low_quality_but_no_next_task():
-    decision = ReflectionDecision(reasoning="Answer is out of scope.", quality="low", reason="out of scope", next_task=None)
+    decision = ReflectionDecision(reasoning="Answer is out of scope.", quality="low", reason="out of scope", next_tasks=[])
     llm = _make_llm(structured_return=StructuredResponse(parsed=decision, usage=_make_usage()))
     result = _make_retrieval_result()
     answer = GenerationResult(answer="Bad answer.", citations=[])

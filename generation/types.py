@@ -68,7 +68,10 @@ class ReflectionDecision(BaseModel):
     reasoning: str = Field(description="Check relevance then verify each factual claim against the context before deciding quality.")
     quality: Literal["high", "low"]
     reason: str | None = None
-    next_task: RetrievalTaskNoHyde | None = None
+    next_tasks: list[RetrievalTaskNoHyde] = Field(
+        default_factory=list,
+        description="One task per remaining gap; each task's filter targets exactly one ticker. Empty when quality is high.",
+    )
 
 
 class GenerationResponse(BaseModel):

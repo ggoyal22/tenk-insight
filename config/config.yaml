@@ -112,7 +112,7 @@ generation:
     enabled: true               # enable iterative retrieval (check_hop node)
     max_hops: 1                  # max retrieval rounds before forcing an answer
   reflection:
-    enabled: false               # re-evaluate answer quality and trigger extra retrieval if needed
+    enabled: true                # re-evaluate answer quality and trigger extra retrieval if needed
     max_iterations: 2
   eval_stop_after: null          # stop after this node in eval runs; null = run to completion
                                  # valid values: analyze_query | hyde_expand | retrieve | check_hop | generate | reflect

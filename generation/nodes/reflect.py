@@ -7,6 +7,7 @@ from config.loader import GenerationConfig
 from llm.base import BaseLLM, LLMError
 from llm.types import Message
 from generation.nodes._context import build_context
+from generation.nodes.generate import _deduplicate
 from generation.token_limits import MAX_TOKENS_REFLECT
 from generation.types import GenerationResult, GenerationState, ReflectionDecision, RetrievalTask
 
@@ -17,7 +18,9 @@ def make_reflect(llm: BaseLLM, config: GenerationConfig, prompt: str) -> Callabl
     def reflect(state: GenerationState) -> dict:
         get_writer()("Reviewing answer quality...")
         answer = state["answer"]
-        context = build_context([r for group in state["completed_results"] for r in group])
+        # Dedup+order identically to generate so the answer's [N] markers line up with
+        # the numbered context the reviewer sees, and duplicate parents are dropped.
+        context = build_context(_deduplicate(state["completed_results"]))
         messages = [
             Message(role="system", content=prompt),
             Message(
@@ -48,18 +51,21 @@ def make_reflect(llm: BaseLLM, config: GenerationConfig, prompt: str) -> Callabl
             for r in group
         })
         pending_tasks = (
-            [RetrievalTask.model_validate({
-                **decision.next_task.model_dump(),
-                "exclude_parent_ids": seen_parent_ids,
-            })]
-            if decision.quality == "low" and decision.next_task
+            [
+                RetrievalTask.model_validate({
+                    **task.model_dump(),
+                    "exclude_parent_ids": seen_parent_ids,
+                })
+                for task in decision.next_tasks
+            ]
+            if decision.quality == "low"
             else []
         )
         if decision.quality == "low":
             logger.warning(
-                "Reflection quality=low reason=%r next_task=%r reflection_count=%d.",
+                "Reflection quality=low reason=%r next_tasks=%d reflection_count=%d.",
                 decision.reason,
-                decision.next_task.keyword_query if decision.next_task else None,
+                len(pending_tasks),
                 state["reflection_count"] + 1,
             )
         else:

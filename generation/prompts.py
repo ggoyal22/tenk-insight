@@ -373,22 +373,26 @@ REFLECTION_PROMPT = f"""You are a quality reviewer evaluating an answer generate
 You will receive the original question, the generated answer, and the context excerpts used.
 
 Return a JSON object:
-  reasoning: scratchpad — work through relevance then grounding before setting quality
-  quality  : "high" if both checks pass, "low" if either fails
-  reason   : concise explanation of the failure — null when quality is "high"
-  next_task: retrieval task that would resolve the gap — null when quality is "high"
+  reasoning : scratchpad — work through relevance then grounding before setting quality
+  quality   : "high" if both checks pass, "low" if either fails
+  reason    : concise explanation of the failure — null when quality is "high"
+  next_tasks: list of retrieval tasks that would resolve the gaps — empty list when quality is "high"
 
 Check in order:
 1. Relevance — does the answer directly address what was asked?
-2. Grounding — does every specific figure, named entity, and affirmative factual claim in the answer trace to at least one provided context excerpt?
+2. Grounding — does every specific figure, named entity, and affirmative factual claim in the answer trace to at least one provided context excerpt? A figure is grounded only if the cited excerpt states it for the SPECIFIC metric, entity, and direction the answer claims — a same-noun figure of a different metric (e.g. gross property and equipment when capital expenditures was asked), a consolidated or company-wide figure used as a segment/region/product-line figure, or an opposite-direction figure (an amount received reported as an amount paid) is NOT grounded even though the number appears verbatim in the context.
+
+Complete both checks inside the `reasoning` field before setting `quality`. The value of `quality` must follow from the completed reasoning — do not set it before finishing both checks.
 
 If no context excerpts are provided or all are unrelated to the question, treat grounding as failed.
 
-When quality is "low", populate next_task:
+When quality is "low", populate next_tasks — one entry per remaining gap, each targeting exactly one ticker; never bundle two companies or periods into one task. Each entry:
   keyword_query : {_KEYWORD_QUERY_RULES}
+  Exception: if specific entity names (e.g. segment names, geographic region names, product line names) already appear in the context and are directly relevant to the gap, use those exact names — the category-term rule does not apply when specific member names are already known.
   semantic_query: one sentence natural language question targeting the specific gap
-  hyde_query    : null
   filter        :{_FILTER_FIELDS}{_SECTION_LABELS}
+
+LOOP GUARD — a reformulation must change WHAT gets retrieved, not just edit tokens; the context already seen will be excluded from the next retrieval, so a near-identical query returns nothing new. Switch the retrieval target: use different discriminative terms, change the section filter, or rephrase the semantic query to name a different statement. Before returning, strip any dates, fiscal year numbers, or ticker symbols that belong to a different period or company than the gap you are filling.
 
 ---
 
@@ -403,12 +407,13 @@ Output:
   "reasoning": "Relevance: yes, the answer addresses gross margin directly. Grounding: the answer states 72.7% but the context shows 56.9% — this specific figure is not supported by the excerpt.",
   "quality": "low",
   "reason": "Answer states 72.7% but context shows 56.9% — the specific figure is ungrounded.",
-  "next_task": {{
-    "keyword_query": "gross margin gross profit revenue cost",
-    "semantic_query": "What was NVIDIA's gross margin percentage in fiscal year 2024?",
-    "hyde_query": null,
-    "filter": {{"ticker": "NVDA", "fiscal_year": 2024, "section": null}}
-  }}
+  "next_tasks": [
+    {{
+      "keyword_query": "gross margin gross profit revenue cost",
+      "semantic_query": "What was NVIDIA's gross margin percentage in fiscal year 2024?",
+      "filter": {{"ticker": "NVDA", "fiscal_year": 2024, "section": null}}
+    }}
+  ]
 }}
 
 ---
