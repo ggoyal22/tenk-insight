@@ -12,4 +12,10 @@ class FeedbackRepo(ABC):
         answer: str,
         rating: bool,
         comment: str | None,
-    ) -> None: ...
+    ) -> str:
+        """Persist a rating and return the new row's id so a comment can be
+        attached later."""
+        ...
+
+    @abstractmethod
+    def update_comment(self, feedback_id: str, comment: str) -> None: ...
