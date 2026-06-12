@@ -125,7 +125,7 @@ logging:
 
 # ── Tracing ───────────────────────────────────────────────────────────────────
 tracing:
-  enabled: false                # set true to export traces (requires OTEL_EXPORTER_OTLP_ENDPOINT in .env)
+  enabled: true                # set true to export traces (requires OTEL_EXPORTER_OTLP_ENDPOINT in .env)
 
 
 # ── Prompts ───────────────────────────────────────────────────────────────────

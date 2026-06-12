@@ -35,10 +35,22 @@ def setup_tracing(config: TracingConfig, project_name: str | None = None) -> Non
             if project_name
             else None
         )
+        api_key = os.environ.get("PHOENIX_API_KEY", "")
+        space_id = os.environ.get("ARIZE_SPACE_ID", "")
+        if bool(api_key) != bool(space_id):
+            raise ValueError(
+                "PHOENIX_API_KEY and ARIZE_SPACE_ID must both be set or both be unset."
+            )
+        headers = (
+            {"api_key": api_key, "space_id": space_id}
+            if api_key
+            else {}
+        )
+        exporter = OTLPSpanExporter(headers=headers)
         provider = TracerProvider(resource=resource)
-        provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter()))
+        provider.add_span_processor(BatchSpanProcessor(exporter))
         trace.set_tracer_provider(provider)
-        LangChainInstrumentor().instrument()
+        LangChainInstrumentor().instrument(tracer_provider=provider)
         logger.info(
             "Tracing enabled — exporting spans to %s",
             os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT", "(endpoint not set)"),
