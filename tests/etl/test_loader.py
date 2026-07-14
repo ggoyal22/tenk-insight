@@ -96,6 +96,54 @@ def _install_transaction(db_client: MagicMock) -> MagicMock:
 # Tests
 # ---------------------------------------------------------------------------
 
+def test_is_fully_ingested_true_when_exists_with_all_chunks_embedded():
+    loader, _, filings_repo, _, chunks_repo, _ = _make_loader()
+    existing_id = uuid4()
+    existing = MagicMock()
+    existing.id = existing_id
+    filings_repo.get_by_accession_number.return_value = existing
+
+    chunk = _chunk_record(existing_id, 0)
+    chunk.embedded_at = datetime.now(timezone.utc)
+    chunks_repo.get_by_filing_id.return_value = [chunk]
+
+    assert loader.is_fully_ingested("0001045810-24-000001") is True
+
+
+def test_is_fully_ingested_false_when_filing_absent():
+    loader, _, filings_repo, _, chunks_repo, _ = _make_loader()
+    filings_repo.get_by_accession_number.return_value = None
+
+    assert loader.is_fully_ingested("0001045810-24-000001") is False
+    chunks_repo.get_by_filing_id.assert_not_called()
+
+
+def test_is_fully_ingested_false_when_some_chunks_missing_embeddings():
+    loader, _, filings_repo, _, chunks_repo, _ = _make_loader()
+    existing_id = uuid4()
+    existing = MagicMock()
+    existing.id = existing_id
+    filings_repo.get_by_accession_number.return_value = existing
+
+    embedded = _chunk_record(existing_id, 0)
+    embedded.embedded_at = datetime.now(timezone.utc)
+    missing = _chunk_record(existing_id, 1)
+    missing.embedded_at = None
+    chunks_repo.get_by_filing_id.return_value = [embedded, missing]
+
+    assert loader.is_fully_ingested("0001045810-24-000001") is False
+
+
+def test_is_fully_ingested_false_when_filing_has_no_chunks():
+    loader, _, filings_repo, _, chunks_repo, _ = _make_loader()
+    existing = MagicMock()
+    existing.id = uuid4()
+    filings_repo.get_by_accession_number.return_value = existing
+    chunks_repo.get_by_filing_id.return_value = []  # orphan row from a crash
+
+    assert loader.is_fully_ingested("0001045810-24-000001") is False
+
+
 def test_load_skips_fully_ingested_filing():
     loader, db_client, filings_repo, _, chunks_repo, _ = _make_loader()
     existing_id = uuid4()

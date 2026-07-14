@@ -51,6 +51,7 @@ def _wire_success(downloader, parser, chunker, embedder, loader, n_children: int
     chunker.chunk.return_value = ([_make_parent()], children)
     embedder.embed.return_value = [[0.1] * 4] * n_children
     embedder.model_name = "test-model"
+    loader.is_fully_ingested.return_value = False
     loader.load.return_value = MagicMock()
     return filing, children
 
@@ -77,6 +78,31 @@ def test_run_skips_when_filing_not_found():
 
     parser.parse.assert_not_called()
     loader.load.assert_not_called()
+
+
+def test_run_skips_before_embedding_when_already_fully_ingested():
+    pipeline, downloader, parser, chunker, embedder, loader = _make_pipeline()
+    _wire_success(downloader, parser, chunker, embedder, loader)
+    loader.is_fully_ingested.return_value = True  # filing already complete in DB
+
+    pipeline.run(tickers=["NVDA"], form_types=["10-K"], years=[2024])
+
+    # The skip happens right after fetch — no expensive work runs.
+    parser.parse.assert_not_called()
+    chunker.chunk.assert_not_called()
+    embedder.embed.assert_not_called()
+    loader.load.assert_not_called()
+
+
+def test_run_processes_when_partially_embedded():
+    pipeline, downloader, parser, chunker, embedder, loader = _make_pipeline()
+    _wire_success(downloader, parser, chunker, embedder, loader)
+    loader.is_fully_ingested.return_value = False  # interrupted run, missing embeddings
+
+    pipeline.run(tickers=["NVDA"], form_types=["10-K"], years=[2024])
+
+    embedder.embed.assert_called_once()
+    loader.load.assert_called_once()
 
 
 def test_run_skips_when_chunker_returns_empty():

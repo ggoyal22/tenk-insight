@@ -30,6 +30,23 @@ class Loader:
         self._chunks_repo = chunks_repo
         self._vector_store = vector_store
 
+    def is_fully_ingested(self, accession_number: str) -> bool:
+        """Whether a filing can be skipped without re-running the pipeline.
+
+        Mirrors the skip condition at the top of `load`: True only when the
+        filing exists, has at least one chunk, and no chunk is missing its
+        embedding. Lets the pipeline skip the download/parse/chunk/embed work
+        up front; `load` keeps its own copy of this check as the safety net
+        for concurrent workers.
+        """
+        existing = self._filings_repo.get_by_accession_number(accession_number)
+        if not existing:
+            return False
+        existing_chunks = self._chunks_repo.get_by_filing_id(existing.id)
+        if not existing_chunks:
+            return False
+        return all(c.embedded_at is not None for c in existing_chunks)
+
     def load(
         self,
         filing: FilingRecord,

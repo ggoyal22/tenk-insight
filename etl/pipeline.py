@@ -47,6 +47,12 @@ class Pipeline:
         try:
             logger.info("Processing %s", label)
             filing, raw_path = self._downloader.fetch(ticker, form_type, year)
+            if self._loader.is_fully_ingested(filing.accession_number):
+                logger.info(
+                    "%s already fully ingested (%s) — skipping",
+                    label, filing.accession_number,
+                )
+                return "skipped"
             sections = self._parser.parse(raw_path)
             parents, children = self._chunker.chunk(sections, filing)
             if not parents or not children:
