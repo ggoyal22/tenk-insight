@@ -23,6 +23,7 @@ from generation.factory import build_generation_pipeline, make_initial_state
 from generation.types import Citation, GenerationResult, total_pipeline_usage
 from llm.pricing import compute_cost
 from llm.types import LLMUsage, Message
+from tracing.context import query_span
 from tracing.setup import setup_tracing
 
 logger = logging.getLogger(__name__)
@@ -138,7 +139,7 @@ def submit_query(query: str, graph, config, feedback_repo: FeedbackRepo) -> None
 
     with st.chat_message("assistant"):
         try:
-            with st.status("Processing...", expanded=True) as status:
+            with st.status("Processing...", expanded=True) as status, query_span(query):
                 state = make_initial_state(
                     query, history=st.session_state.history[-MAX_HISTORY_MESSAGES:]
                 )

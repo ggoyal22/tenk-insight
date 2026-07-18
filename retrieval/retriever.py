@@ -1,6 +1,14 @@
+import json
 import logging
 from dataclasses import replace
 from uuid import UUID
+
+from opentelemetry import trace
+from openinference.semconv.trace import (
+    OpenInferenceMimeTypeValues,
+    OpenInferenceSpanKindValues,
+    SpanAttributes,
+)
 
 from config.loader import RetrievalConfig
 from db.models import ChunkRecord
@@ -12,8 +20,22 @@ from retrieval.keyword.base import BaseKeywordRetriever
 from retrieval.reranker.base import BaseReranker
 from retrieval.types import MetadataFilter, RetrievalResult
 from retrieval.vector.base import BaseVectorRetriever
+from tracing.context import resolve_parent_context
 
 logger = logging.getLogger(__name__)
+
+
+def _candidates_attr(ranked: list[tuple[UUID, float]]) -> str:
+    """Serialize a ranked (chunk_id, score) list as a compact JSON array — ids and
+    scores only, scores rounded to 6 places, no chunk text."""
+    return json.dumps([[str(cid), round(score, 6)] for cid, score in ranked])
+
+
+def _record_candidates(span, ranked: list[tuple[UUID, float]]) -> None:
+    """Record a stage's ranked list as the span's JSON output so Phoenix renders it
+    in the standard output view rather than as an opaque custom attribute."""
+    span.set_attribute(SpanAttributes.OUTPUT_VALUE, _candidates_attr(ranked))
+    span.set_attribute(SpanAttributes.OUTPUT_MIME_TYPE, OpenInferenceMimeTypeValues.JSON.value)
 
 
 class Retriever:
@@ -58,7 +80,8 @@ class Retriever:
         if self._section_too_restrictive(filters, results):
             widened = replace(filters, section=None)
             relaxed = self._search(
-                keyword_query, semantic_embedding, widened, rerank_query, exclude_parent_ids
+                keyword_query, semantic_embedding, widened, rerank_query, exclude_parent_ids,
+                is_section_retry=True,
             )
             if relaxed:
                 results = self._merge(results, relaxed)
@@ -117,59 +140,100 @@ class Retriever:
         filters: MetadataFilter | None = None,
         rerank_query: str | None = None,
         exclude_parent_ids: list[UUID] | None = None,
+        is_section_retry: bool = False,
     ) -> list[RetrievalResult]:
-        filing_ids = self._resolve_filing_ids(filters)
-        raw_section = filters.section if filters else None
-        section = raw_section.strip().rstrip(".") if raw_section else None
-        if section and section.lower() == "null":
-            section = None
-
-        ranked_lists: list[list[tuple[UUID, float]]] = []
-        vector_scores: dict[UUID, float] = {}
-        keyword_scores: dict[UUID, float] = {}
-
-        if self._vector:
-            vector_results = self._vector.search(
-                query_embedding=semantic_embedding,
-                top_k=self._config.vector_search.oversample_k,
-                filing_ids=filing_ids,
-                section=section,
-                exclude_parent_ids=exclude_parent_ids,
+        tracer = trace.get_tracer(__name__)
+        # Runs inside the retrieve node, whose instrumentor span isn't in the OTel
+        # ambient context; resolve it so this span nests under the node. The child
+        # spans below then nest under this one through ordinary ambient context.
+        parent = resolve_parent_context()
+        with tracer.start_as_current_span("retrieval.search", context=parent) as span:
+            span.set_attribute(
+                SpanAttributes.OPENINFERENCE_SPAN_KIND,
+                OpenInferenceSpanKindValues.RETRIEVER.value,
             )
-            if vector_results:
-                vector_scores = {cid: s for cid, s in vector_results}
-                ranked_lists.append(vector_results)
+            span.set_attribute("retrieval.section_retry", is_section_retry)
 
-        if self._keyword:
-            keyword_results = self._keyword.search(
-                query=keyword_query,
-                top_k=self._config.keyword_search.top_k,
-                filing_ids=filing_ids,
-                section=section,
-                exclude_parent_ids=exclude_parent_ids,
+            filing_ids = self._resolve_filing_ids(filters)
+            raw_section = filters.section if filters else None
+            section = raw_section.strip().rstrip(".") if raw_section else None
+            if section and section.lower() == "null":
+                section = None
+            span.set_attribute("retrieval.section_filter", section or "none")
+            span.set_attribute(
+                "retrieval.filing_id_count", -1 if filing_ids is None else len(filing_ids)
             )
-            if keyword_results:
-                keyword_scores = {cid: s for cid, s in keyword_results}
-                ranked_lists.append(keyword_results)
 
-        if not ranked_lists:
-            logger.warning("Both vector and keyword search returned no results.")
-            return []
+            ranked_lists: list[list[tuple[UUID, float]]] = []
+            vector_scores: dict[UUID, float] = {}
+            keyword_scores: dict[UUID, float] = {}
 
-        fused = self._fusion.fuse(*ranked_lists)
-        fused = fused[: self._config.fusion.top_k]
+            if self._vector:
+                with tracer.start_as_current_span("retrieval.vector_search") as vspan:
+                    vspan.set_attribute(
+                        "retrieval.oversample_k", self._config.vector_search.oversample_k
+                    )
+                    vector_results = self._vector.search(
+                        query_embedding=semantic_embedding,
+                        top_k=self._config.vector_search.oversample_k,
+                        filing_ids=filing_ids,
+                        section=section,
+                        exclude_parent_ids=exclude_parent_ids,
+                    )
+                    vspan.set_attribute("retrieval.result_count", len(vector_results))
+                    _record_candidates(vspan, vector_results)
+                if vector_results:
+                    vector_scores = {cid: s for cid, s in vector_results}
+                    ranked_lists.append(vector_results)
 
-        chunks = self._chunks.get_by_ids_no_embedding([cid for cid, _ in fused])
+            if self._keyword:
+                with tracer.start_as_current_span("retrieval.keyword_search") as kspan:
+                    kspan.set_attribute("retrieval.top_k", self._config.keyword_search.top_k)
+                    keyword_results = self._keyword.search(
+                        query=keyword_query,
+                        top_k=self._config.keyword_search.top_k,
+                        filing_ids=filing_ids,
+                        section=section,
+                        exclude_parent_ids=exclude_parent_ids,
+                    )
+                    kspan.set_attribute("retrieval.result_count", len(keyword_results))
+                    _record_candidates(kspan, keyword_results)
+                if keyword_results:
+                    keyword_scores = {cid: s for cid, s in keyword_results}
+                    ranked_lists.append(keyword_results)
 
-        reranking_active = bool(self._reranker and self._config.reranking.enabled)
-        reranked: list[tuple[UUID, float]] | None = None
+            if not ranked_lists:
+                logger.warning("Both vector and keyword search returned no results.")
+                span.set_attribute("retrieval.result_count", 0)
+                return []
 
-        if reranking_active:
-            reranked = self._reranker.rerank(rerank_query or keyword_query, chunks)
+            with tracer.start_as_current_span("retrieval.fusion") as fspan:
+                fused = self._fusion.fuse(*ranked_lists)
+                fused = fused[: self._config.fusion.top_k]
+                fspan.set_attribute("retrieval.fused_count", len(fused))
+                _record_candidates(fspan, fused)
 
-        results = self._enrich(fused, vector_scores, keyword_scores, chunks, reranked=reranked)
-        top_k = self._config.reranking.top_k if reranking_active else self._config.final_top_k
-        return results[:top_k]
+            chunks = self._chunks.get_by_ids_no_embedding([cid for cid, _ in fused])
+
+            reranking_active = bool(self._reranker and self._config.reranking.enabled)
+            reranked: list[tuple[UUID, float]] | None = None
+
+            if reranking_active:
+                # No RERANKER span kind: Phoenix's reranker template only renders the
+                # reranker.*_documents schema, which we don't populate, and hides
+                # output.value. Left generic so the ranked output stays visible.
+                with tracer.start_as_current_span("retrieval.rerank") as rspan:
+                    rspan.set_attribute("retrieval.candidate_count", len(chunks))
+                    reranked = self._reranker.rerank(rerank_query or keyword_query, chunks)
+                    if reranked:
+                        rspan.set_attribute("retrieval.top_score", reranked[0][1])
+                    _record_candidates(rspan, reranked)
+
+            results = self._enrich(fused, vector_scores, keyword_scores, chunks, reranked=reranked)
+            top_k = self._config.reranking.top_k if reranking_active else self._config.final_top_k
+            results = results[:top_k]
+            span.set_attribute("retrieval.result_count", len(results))
+            return results
 
     def _resolve_filing_ids(self, filters: MetadataFilter | None) -> list[UUID] | None:
         if not filters or not self._config.metadata_filtering.enabled:

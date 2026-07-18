@@ -8,6 +8,7 @@ from openinference.semconv.trace import MessageAttributes, OpenInferenceSpanKind
 from pydantic import BaseModel
 
 from llm.types import LLMResponse, Message, StructuredResponse
+from tracing.context import resolve_parent_context
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -16,7 +17,10 @@ def _trace_llm(fn):
     @wraps(fn)
     def wrapper(self, messages: list[Message], *args, **kwargs):
         tracer = trace.get_tracer(__name__)
-        with tracer.start_as_current_span(f"llm.{fn.__name__}") as span:
+        # Instrumentor node spans never enter the OTel ambient context, so resolve
+        # the issuing node's span explicitly to nest this call under it.
+        parent = resolve_parent_context()
+        with tracer.start_as_current_span(f"llm.{fn.__name__}", context=parent) as span:
             span.set_attribute(SpanAttributes.OPENINFERENCE_SPAN_KIND, OpenInferenceSpanKindValues.LLM.value)
             span.set_attribute(SpanAttributes.LLM_PROVIDER, getattr(self, "_provider", "unknown"))
             span.set_attribute(SpanAttributes.LLM_MODEL_NAME, self._model)
