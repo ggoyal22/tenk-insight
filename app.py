@@ -291,6 +291,17 @@ def main() -> None:
         turns = MAX_HISTORY_MESSAGES // 2
         st.caption(f"Follow-up questions use the last {turns} exchanges for context.")
 
+    # Rendered into the pinned bottom region alongside the chat input. Anything
+    # in the scrollable main flow gets pushed out of view as the conversation
+    # grows, and the wait has to be expected on every question, not just the first.
+    with st.bottom:
+        st.info(
+            ":small[Answers take 15 to 40 seconds. No answer is cached, so you see "
+            "what the system actually does. Each question runs retrieval, "
+            "generation, and a reflection pass that checks the answer against its "
+            "sources and can send it back for more retrieval. Production systems "
+            "get tuned to whatever latency budget the use case needs.]"
+        )
     st.caption(f"Generation model: {config.llm.model}")
     if prompt := st.chat_input("Ask a question about SEC filings..."):
         submit_query(prompt, graph, config, feedback_repo)
