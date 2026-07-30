@@ -1,33 +1,37 @@
+# Versions are pinned exactly so a local checkout, the CI runner and the deployed
+# image resolve to the same packages.
+
 # Config loading
-pydantic~=2.0          # typed config models and validation
-pyyaml~=6.0            # reading config/config.yaml
-python-dotenv~=1.0     # loading .env into os.environ
+pydantic==2.13.3          # typed config models and validation
+pyyaml==6.0.3             # reading config/config.yaml
+python-dotenv==1.2.2      # loading .env into os.environ
 
 # Database
-psycopg2-binary~=2.9   # PostgreSQL driver (binary wheel; swap for psycopg2 in production)
-pgvector~=0.2          # pgvector Python client for VECTOR type support
+psycopg2-binary==2.9.12   # PostgreSQL driver (binary wheel; swap for psycopg2 in production)
+pgvector==0.4.2           # pgvector Python client for VECTOR type support
 
 # ETL
-edgartools~=5.30       # SEC EDGAR filing download and HTML parsing
-tiktoken~=0.7          # token counting for chunk sizing (cl100k_base encoding)
-sentence-transformers~=5.0  # local embedding model runner + cross-encoder reranker
-numpy~=1.26                 # float32 rescore in vector retrieval
+edgartools==5.30.0        # SEC EDGAR filing download and HTML parsing
+tiktoken==0.12.0          # token counting for chunk sizing (cl100k_base encoding)
+sentence-transformers==5.4.1  # local embedding model runner + cross-encoder reranker
+numpy==2.4.4                  # float32 rescore in vector retrieval
 
 # LLM
-ollama~=0.4                 # Ollama Python SDK for local LLM inference
-openai~=1.0                 # OpenAI Python SDK
-langgraph~=1.1              # graph orchestration for multi-step generation pipeline
+ollama==0.6.1                 # Ollama Python SDK for local LLM inference
+openai==2.33.0                # OpenAI Python SDK
+langgraph==1.1.10             # graph orchestration for multi-step generation pipeline
 
 # Tracing
-opentelemetry-sdk~=1.0                          # OTel SDK — tracer provider and span processor
-opentelemetry-exporter-otlp-proto-http~=1.0     # OTLP/HTTP exporter; reads OTEL_EXPORTER_OTLP_ENDPOINT automatically
-openinference-instrumentation-langchain~=0.1    # auto-instruments LangGraph node transitions
-openinference-semantic-conventions~=0.1         # semantic conventions for LLM span attributes
+opentelemetry-sdk==1.39.1                          # OTel SDK — tracer provider and span processor
+opentelemetry-exporter-otlp-proto-http==1.39.1     # OTLP/HTTP exporter; reads OTEL_EXPORTER_OTLP_ENDPOINT automatically
+openinference-instrumentation-langchain==0.1.63    # auto-instruments LangGraph node transitions
+openinference-semantic-conventions==0.1.29         # semantic conventions for LLM span attributes
 
 # Evaluation
-ragas~=0.4                  # RAG evaluation metrics (faithfulness, answer_relevancy, context_precision, context_recall)
-langchain-openai~=0.2       # LangChain OpenAI wrapper; required by RAGAS for judge LLM
+ragas==0.4.3                  # RAG evaluation metrics (faithfulness, answer_relevancy, context_precision, context_recall)
+langchain-openai==1.2.1       # LangChain OpenAI wrapper; required by RAGAS for judge LLM
+langchain-community==0.4.1    # transitive via RAGAS; pinned here because RAGAS imports
+                              # submodules whose location varies between versions
 
 # UI
-streamlit~=1.40             # chat demo interface
-
+streamlit==1.57.0             # chat demo interface
