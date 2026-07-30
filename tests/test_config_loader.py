@@ -47,11 +47,17 @@ from tests.conftest import (
     VALID_VECTOR_INDEX,
 )
 
-# The cache test requires real config files — skip if .env is absent (e.g. CI)
+# These tests drive the real loader against config/config.yaml, so they need the
+# settings the application requires at startup. Those come either from a local
+# .env or from variables exported directly, which is how Docker and CI supply
+# them. ENVIRONMENT stands in for the whole set: it is required, has no default,
+# and anything that configures the app sets it. When it is present but another
+# required variable is missing, the loader raises and the test fails, which is
+# the intended signal.
 _ENV_FILE = Path(__file__).resolve().parent.parent / ".env"
-_requires_env_file = pytest.mark.skipif(
-    not _ENV_FILE.exists(),
-    reason=".env not found — skipping integration test"
+_requires_real_config = pytest.mark.skipif(
+    not _ENV_FILE.exists() and not os.environ.get("ENVIRONMENT"),
+    reason="no .env file and no config environment — skipping integration test"
 )
 
 
@@ -395,7 +401,7 @@ def test_require_env_int_rejects_non_integer(monkeypatch):
 # Cache behaviour
 # ---------------------------------------------------------------------------
 
-@_requires_env_file
+@_requires_real_config
 def test_load_config_returns_same_instance():
     # patch.dict restores os.environ to its original state after the test,
     # preventing load_dotenv side effects from leaking into subsequent tests
@@ -500,7 +506,7 @@ def test_evaluation_rejects_anthropic_judge_provider(monkeypatch):
 # load_eval_config cache behaviour
 # ---------------------------------------------------------------------------
 
-@_requires_env_file
+@_requires_real_config
 def test_load_eval_config_returns_same_instance(monkeypatch):
     monkeypatch.setenv("PHOENIX_DB_PATH", "/tmp/test.db")
     monkeypatch.setenv("JUDGE_LLM_API_KEY", "sk-test-key")

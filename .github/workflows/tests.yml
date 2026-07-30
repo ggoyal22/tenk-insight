@@ -34,12 +34,23 @@ jobs:
           --health-timeout 5s
           --health-retries 5
 
+    # TEST_DB_NAME points the integration fixtures at the service above. The rest
+    # are what config/loader.py requires at startup: supplying them lets the tests
+    # that load the real config/config.yaml run rather than skip, so a malformed
+    # config fails the build instead of surfacing at deploy time.
     env:
+      ENVIRONMENT: test
+      EDGAR_USER_AGENT: tenk-insight ci@example.com
       DB_HOST: localhost
       DB_PORT: 5432
+      DB_NAME: sec_edgar
       DB_USER: postgres
       DB_PASSWORD: postgres
+      DB_POOL_SIZE: 20
       TEST_DB_NAME: test_sec_edgar
+      # config.yaml enables tracing, and that validator requires an endpoint.
+      # No test starts an exporter, so this only satisfies validation.
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://localhost:6006
 
     steps:
       - uses: actions/checkout@v4
