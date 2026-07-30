@@ -1,0 +1,68 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# A new push to the same branch makes an in-flight run obsolete.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    # The integration suite talks to real Postgres: pgvector similarity search,
+    # full-text search and the fusion query cannot be meaningfully mocked. Without
+    # this service TEST_DB_NAME is unset and tests/conftest.py skips them silently,
+    # so the build would pass having exercised none of the SQL.
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DB_HOST: localhost
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      TEST_DB_NAME: test_sec_edgar
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+
+      # sentence-transformers pulls torch, and the default PyPI wheel bundles the
+      # CUDA runtime — gigabytes of GPU libraries this CPU-only job never loads.
+      # Installing from the CPU index first means the next step finds the
+      # requirement already satisfied.
+      - name: Install CPU-only torch
+        run: pip install torch --index-url https://download.pytorch.org/whl/cpu
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt -r requirements-dev.txt
+
+      # The fixture creates and drops TEST_DB_NAME itself and applies the schema,
+      # which creates the vector extension, so the service needs no seeding.
+      - name: Run tests
+        run: pytest -q --durations=10
