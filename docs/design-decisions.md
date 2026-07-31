@@ -577,7 +577,7 @@ call, and a reflection pass adds a `reflect` call, plus a regeneration when it a
 | Comparison | 15,159 | 940 | ~$0.0028 |
 | Out-of-scope | 3,449 | 183 | ~$0.0006 |
 
-That works out to roughly $2 to $3 per thousand queries, and a full evaluation run over the
+That works out to roughly $3 per thousand queries, and a full evaluation run over the
 golden set costs about $0.20. Each answer in the UI shows its own token usage and estimated
 cost, so a user sees the price of the query they just ran.
 

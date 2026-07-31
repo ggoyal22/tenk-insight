@@ -318,6 +318,14 @@ Fixing the evaluation setup is the first item in [what's next](docs/design-decis
 
 Every inference run emits OpenTelemetry spans to [Arize Phoenix](https://github.com/Arize-ai/phoenix), nested under a single trace per query. Spans capture the full pipeline state: query, retrieved chunks, generated answer, token usage, and per-node latency. Within that trace, each LLM call sits under the node that issued it with the structured reasoning behind its output, and each retrieval stage (vector search, keyword search, fusion, reranking) records its own ranked chunk IDs and scores, so a chunk can be followed from first retrieval to final ranking. Setting `PHOENIX_API_KEY` and `ARIZE_SPACE_ID` sends the same spans to Arize Cloud instead.
 
+![One query as a single trace, with analyze_query, embed_queries, retrieve, check_hop, generate and reflect nested under the root span. Each row shows its input, output and latency, and every LLM call carries its token count and cost](docs/assets/trace-overview.png)
+
+*One query as a single trace. Every step carries its own latency, and every LLM call its token count and cost.*
+
+![The retrieve span expanded into vector search, keyword search, fusion and reranking, each timed. Beside it, that step's input and output show the keyword and semantic queries, the metadata filters, and the score each stage gave a retrieved chunk](docs/assets/trace-retrieval.png)
+
+*The same trace with `retrieve` expanded: each retrieval stage timed, and the queries, filters and scores behind a result.*
+
 ### Running an evaluation
 
 ```bash
@@ -457,7 +465,7 @@ sec_edgar/
 
 - **Focused on 10-K filings.** Annual reports are a deliberate scope, chosen to keep the corpus tight and well tested. The system answers only about companies already loaded and declines anything outside that instead of guessing. Adding companies is just config, and because the rest of the pipeline is form-agnostic, other filing types like 10-Qs or 8-Ks are a natural extension rather than a rebuild.
 - **No derived metrics.** The model reports figures the way the filing states them and doesn't calculate derived ones. Ask for a gross margin the filing never prints and you get the revenue and cost lines, not a percentage it worked out itself. That's deliberate, so it never shows a number the source didn't actually state.
-- **It runs on a small, cheap model.** Every LLM call in the pipeline uses `gpt-4o-mini`, which keeps a run at roughly $2–3 per thousand queries. The structured-reasoning prompts get it most of the way to a larger model's accuracy, but it can still trip on the hardest questions. Switching to a stronger model is a one-line config change if you'd rather trade cost for quality (see [decision #12](docs/design-decisions.md#12-small-model-kept-honest-by-structured-reasoning)).
+- **It runs on a small, cheap model.** Every LLM call in the pipeline uses `gpt-4o-mini`, which keeps a run at roughly $3 per thousand queries. The structured-reasoning prompts get it most of the way to a larger model's accuracy, but it can still trip on the hardest questions. Switching to a stronger model is a one-line config change if you'd rather trade cost for quality (see [decision #12](docs/design-decisions.md#12-small-model-kept-honest-by-structured-reasoning)).
 - **Answers take 15–40 seconds.** Most of that is the model writing out its reasoning before it answers, and longer reasoning means more time. The same step that keeps the small model honest is what slows it down. A more capable model could probably stay accurate with more concise reasoning, which would bring the time down (see [latency analysis](docs/design-decisions.md#latency-analysis)).
 - **No operations layer around the pipeline.** The single hosted instance has no auth or rate limiting, and nothing is cached, so asking the same question twice runs the whole pipeline again instead of returning the stored answer. Each is a scoping choice for a single hosted instance rather than a gap in the pipeline.
 - **The metrics are an early signal.** The numbers above come from a small set of question-and-answer pairs that a model generated from the filings, so treat them as an early read on quality. A larger, fully hand-reviewed set is the next step.

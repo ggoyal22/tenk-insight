@@ -18,7 +18,7 @@ query can trigger, and traces every step.*
 - Questions it can't answer from the loaded filings are declined rather than guessed at
 - The number of model calls per query is bounded in configuration, not left to the
   model's discretion, so cost has a known ceiling
-- Roughly $2 to $3 per thousand questions, measured from traced token usage
+- Roughly $3 per thousand questions, measured from traced token usage
 - Answer quality is scored against a fixed question set, so the effect of a change can be
   measured instead of assumed
 
@@ -31,9 +31,8 @@ The answer to a specific question is usually in there somewhere, but finding it 
 knowing which section to open, and reading carefully enough to catch where a number gets
 qualified further down the page.
 
-General-purpose chatbots answer questions like this readily. The trouble is that they
-invent figures, and offer no way to check one against the source. A fabricated number reads
-exactly like a real one.
+A model can do that reading. The trouble is that a fabricated figure reads exactly like a
+real one. In domains like this an answer you can't check is worse than no answer at all.
 
 None of this is specific to SEC filings. The same thing happens with contracts, internal
 policy, regulatory documents, support manuals, anywhere a wrong answer costs something.
@@ -138,10 +137,10 @@ deterministic metrics for the parts of scoring that don't need a model at all.
 A demo has to work once. Something you run has to have a cost you can predict, a latency
 you can name, and a failure you can trace.
 
-**Cost is bounded before the query runs.** A typical answer costs roughly $2 to $3 per
-thousand questions at current pricing, measured from token counts captured on every call
-rather than estimated. It also doesn't grow with the corpus,
-because the model only ever sees the handful of passages retrieved for that question.
+**Cost is bounded before the query runs.** A typical answer costs roughly $3 per thousand
+questions at current pricing, measured from token counts captured on every call rather than
+estimated. It also doesn't grow with the corpus, because the model only ever sees the
+handful of passages retrieved for that question.
 Thirteen filings or thirteen thousand, the input to the answer step is the same size.
 Building the index makes no model API calls at all, so adding documents costs machine time
 rather than tokens.
