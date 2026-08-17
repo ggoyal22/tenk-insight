@@ -2,6 +2,7 @@
 title: Tenk Insight
 emoji: 📊
 sdk: docker
+license: apache-2.0
 ---
 
 <div align="center">
@@ -474,7 +475,7 @@ sec_edgar/
 
 ## License
 
-Source-available for viewing and evaluation. © 2026 Gaurav Goyal
+Licensed under the [Apache License 2.0](LICENSE). © 2026 Gaurav Goyal
 
 ---
 
