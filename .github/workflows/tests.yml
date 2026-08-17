@@ -66,9 +66,10 @@ jobs:
       # sentence-transformers pulls torch, and the default PyPI wheel bundles the
       # CUDA runtime — gigabytes of GPU libraries this CPU-only job never loads.
       # Installing from the CPU index first means the next step finds the
-      # requirement already satisfied.
+      # requirement already satisfied. requirements.txt is passed as a constraints
+      # file so the pinned version resolves from the CPU index, not PyPI.
       - name: Install CPU-only torch
-        run: pip install torch --index-url https://download.pytorch.org/whl/cpu
+        run: pip install torch --index-url https://download.pytorch.org/whl/cpu -c requirements.txt
 
       - name: Install dependencies
         run: pip install -r requirements.txt -r requirements-dev.txt

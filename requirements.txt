@@ -16,6 +16,18 @@ tiktoken==0.12.0          # token counting for chunk sizing (cl100k_base encodin
 sentence-transformers==5.4.1  # local embedding model runner + cross-encoder reranker
 numpy==2.4.4                  # float32 rescore in vector retrieval
 
+# Transitive via sentence-transformers, pinned here because it accepts wide ranges
+# (transformers<6.0.0, torch>=1.11.0). Left to float, a fresh install picks up a
+# runtime months newer than the one the suite runs against, and the embedding model
+# produces vectors that no longer match what is already stored in pgvector.
+torch==2.11.0
+transformers==5.7.0
+tokenizers==0.22.2
+huggingface_hub==1.13.0
+safetensors==0.7.0
+scikit-learn==1.8.0
+scipy==1.17.1
+
 # LLM
 ollama==0.6.1                 # Ollama Python SDK for local LLM inference
 openai==2.33.0                # OpenAI Python SDK

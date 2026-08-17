@@ -10,11 +10,16 @@ RUN useradd -m -u 1000 user
 
 WORKDIR /app
 
-# Install CPU-only torch first — avoids pulling the CUDA build (~2GB larger)
-# which is unnecessary since HF free tier is CPU-only.
-RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
-
 COPY requirements.txt .
+
+# Install CPU-only torch first — avoids pulling the CUDA build (~2GB larger)
+# which is unnecessary since HF free tier is CPU-only. requirements.txt acts as a
+# constraints file so the version comes from there and the next step finds the
+# requirement already satisfied rather than refetching torch from PyPI.
+RUN pip install --no-cache-dir torch \
+    --index-url https://download.pytorch.org/whl/cpu \
+    -c requirements.txt
+
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Pre-download embedding and reranker models at build time so cold starts
